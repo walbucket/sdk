@@ -1,6 +1,12 @@
 # Walbucket SDK
 
+[![npm version](https://img.shields.io/npm/v/@walbucket/sdk.svg)](https://www.npmjs.com/package/@walbucket/sdk)
+[![npm downloads](https://img.shields.io/npm/dm/@walbucket/sdk.svg)](https://www.npmjs.com/package/@walbucket/sdk)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+
 Cloudinary-like API for decentralized media storage on Sui blockchain.
+
+📦 **NPM Package**: [@walbucket/sdk](https://www.npmjs.com/package/@walbucket/sdk)
 
 ## About
 
