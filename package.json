@@ -49,12 +49,12 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/walbucket/walbucket.git",
+    "url": "https://github.com/walbucket/sdk",
     "directory": "sdk"
   },
-  "homepage": "https://github.com/walbucket/walbucket#readme",
+  "homepage": "https://github.com/walbucket/sdk/#readme",
   "bugs": {
-    "url": "https://github.com/walbucket/walbucket/issues"
+    "url": "https://github.com/walbucket/sdk/issues"
   },
   "engines": {
     "node": ">=18.0.0"
