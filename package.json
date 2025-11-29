@@ -1,0 +1,86 @@
+{
+  "name": "@walbucket/sdk",
+  "version": "0.1.0",
+  "description": "Walbucket SDK - Cloudinary-like API for decentralized media storage on Sui blockchain",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "walbucket",
+    "sui",
+    "blockchain",
+    "storage",
+    "walrus",
+    "seal",
+    "encryption",
+    "media",
+    "cloudinary",
+    "sdk",
+    "decentralized-storage",
+    "web3",
+    "ipfs-alternative"
+  ],
+  "author": {
+    "name": "Walbucket Team"
+  },
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/walbucket/walbucket.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/walbucket/walbucket#readme",
+  "bugs": {
+    "url": "https://github.com/walbucket/walbucket/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "dependencies": {
+    "@mysten/sui": "^1.45.0",
+    "@mysten/seal": "^0.9.4",
+    "axios": "^1.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.17.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "@mysten/seal": "^0.9.4"
+  },
+  "peerDependenciesMeta": {
+    "@mysten/seal": {
+      "optional": true
+    }
+  }
+}
