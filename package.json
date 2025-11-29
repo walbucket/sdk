@@ -51,7 +51,7 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/walbucket/sdk",
+    "url": "git+https://github.com/walbucket/sdk.git",
     "directory": "sdk"
   },
   "homepage": "https://github.com/walbucket/sdk/#readme",
