@@ -1,5 +1,47 @@
 # Release Notes
 
+## v0.1.5 - External SuiClient Support (2024-12-01)
+
+### ✨ New Features
+
+- **External SuiClient Integration**: SDK now accepts an optional `suiClient` parameter for user-pays transactions
+  - Pass your dapp's `SuiClient` instance for proper wallet context
+  - Only used when `gasStrategy` is `'user-pays'`
+  - Enables correct wallet transaction signing with browser wallets
+  - Developer-sponsored transactions continue using internal client
+
+### 🐛 Bug Fixes
+
+- **Wallet Transaction Signing**: Fixed wallet signer detection and transaction routing
+  - Properly detects wallet signers with `signAndExecuteTransaction` method
+  - Uses external client for wallet transactions when provided
+  - Falls back to internal client for keypair signers
+  - Resolves persistent `signer.toSuiAddress is not a function` error
+
+### 🔧 Technical Changes
+
+- Added `externalClient` parameter to `SuiService` constructor
+- Updated `createAsset` to use external client for wallet signers
+- Modified `WalbucketConfig` to include optional `suiClient` parameter
+- Enhanced dapp integration to pass `useSuiClient()` hook result
+
+### 📝 Usage Example
+
+```typescript
+import { useSuiClient } from '@mysten/dapp-kit';
+
+const suiClient = useSuiClient();
+const walbucket = new Walbucket({
+  apiKey: 'your-api-key',
+  network: 'testnet',
+  gasStrategy: 'user-pays',
+  userSigner: walletAccount,
+  suiClient: suiClient, // Pass dapp's client
+});
+```
+
+---
+
 ## v0.1.4 - Wallet Signer Support (2024-12-01)
 
 ### 🐛 Bug Fixes
