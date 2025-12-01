@@ -1,5 +1,41 @@
 # Release Notes
 
+## v0.2.3 - Debug Logging and Transaction Wait Fix (2024-12-01)
+
+### 🐛 Bug Fixes
+
+- **Transaction Indexing**: Increased wait time from 1s to 3s for transaction indexing
+  - Gives blockchain more time to index transaction results
+  - Always queries transaction after wallet execution for complete data
+- **Enhanced Debugging**: Added comprehensive console logging for transaction execution
+  - Logs transaction digest, response structure, and extraction attempts
+  - Helps diagnose asset ID extraction issues
+  - Detailed error messages with full response data
+
+### 🔧 Technical Changes
+
+- Improved transaction result handling for wallet-signed transactions
+- Added fallback extraction from both `effects.created` and `objectChanges`
+- Better error messages with transaction digest included
+
+### 📝 Testing Instructions
+
+After updating to v0.2.3, check your browser console during file upload to see:
+
+- `[SDK] Transaction executed, digest: ...`
+- `[SDK] Initial result structure: ...`
+- `[SDK] Waiting for transaction to be indexed...`
+- `[SDK] Transaction result received: ...`
+- `[SDK] Extracted asset ID from ...`
+
+If the error persists, the console logs will show exactly what data is being received, which will help us fix the issue permanently.
+
+```bash
+pnpm add @walbucket/sdk@latest
+```
+
+---
+
 ## v0.2.2 - Transaction Execution Fixes (2024-12-01)
 
 ### 🐛 Critical Bug Fixes
