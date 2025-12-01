@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.3 - Walrus API Fix (2024-12-01)
+
+### 🐛 Bug Fixes
+
+- **Walrus Upload**: Fixed blob ID extraction from Walrus API v1 response
+  - Updated response type to match actual Walrus API structure
+  - Properly handles `newlyCreated.blobObject.blobId` and `alreadyCertified.blobId` fields
+  - Removes `0x` prefix from blob IDs for consistency
+  - Removed unsafe `Content-Length` header (axios sets it automatically)
+  - Resolves "No blob ID returned from Walrus" error
+
+### 🔧 Technical Changes
+
+- Changed Walrus upload to use `epochs=5` parameter instead of `permanent` flag
+- Updated response interface to match Walrus testnet API v1 specification
+- Improved error logging for debugging upload issues
+
+---
+
 ## v0.1.2 - API Key Validation Fix (2024-12-01)
 
 ### 🐛 Bug Fixes
@@ -39,12 +58,13 @@
 ### 📝 API Changes
 
 **New Method:**
+
 ```typescript
 // List assets for the signer
 const assets = await walbucket.list();
 
 // List assets for a specific address
-const assets = await walbucket.list('0x...');
+const assets = await walbucket.list("0x...");
 ```
 
 ### 🐛 Bug Fixes
@@ -64,7 +84,7 @@ The initial release of Walbucket SDK, providing a Cloudinary-like API for decent
 - **File Upload**: Upload files to Walrus decentralized storage with automatic on-chain metadata registration
 - **File Retrieval**: Retrieve files by asset ID with automatic URL generation
 - **Encryption Support**: Built-in Seal encryption for client-side encryption/decryption with on-chain policies
-- **Flexible Gas Strategies**: 
+- **Flexible Gas Strategies**:
   - Developer-sponsored gas (default)
   - User-pays gas (decentralized)
 - **Network Auto-Detection**: Automatic package ID detection based on network (testnet, mainnet, devnet)
@@ -99,6 +119,7 @@ None at this time.
 ### 🙏 Acknowledgments
 
 Built with:
+
 - [Sui Blockchain](https://sui.io/)
 - [Walrus](https://walrus.space/) - Decentralized blob storage
 - [Seal](https://github.com/MystenLabs/seal) - Client-side encryption
