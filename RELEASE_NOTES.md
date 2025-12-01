@@ -1,5 +1,67 @@
 # Release Notes
 
+## v0.2.0 - SignAndExecuteTransaction Function API (2024-12-01)
+
+### 🎉 Major Update - Breaking Changes
+
+**BREAKING**: Completely redesigned user-pays wallet integration API for maximum simplicity and compatibility.
+
+### ✨ New Features
+
+- **SignAndExecuteTransaction Function**: SDK now accepts a `signAndExecuteTransaction` function instead of signer objects
+  - Pass the function directly from `@mysten/dapp-kit`'s `useSignAndExecuteTransaction` hook
+  - SDK handles transaction building, dapp handles wallet signing
+  - Clean separation of concerns - SDK doesn't need wallet internals
+  - Works with all browser wallets without special handling
+
+### 🔄 Breaking Changes
+
+- **Removed**: `userSigner` parameter (no longer needed)
+- **Removed**: `suiClient` parameter (no longer needed)
+- **Added**: `signAndExecuteTransaction` function parameter for user-pays mode
+- **Updated**: `GasStrategyService.getSigner()` returns `null` for user-pays (signing handled by function)
+
+### 📝 Migration Guide
+
+**Before (v0.1.x):**
+
+```typescript
+const walbucket = new Walbucket({
+  gasStrategy: "user-pays",
+  userSigner: walletAccount,
+  suiClient: suiClient,
+});
+```
+
+**After (v0.2.0):**
+
+```typescript
+import { useSignAndExecuteTransaction } from "@mysten/dapp-kit";
+
+const { mutateAsync: signAndExecuteTransaction } =
+  useSignAndExecuteTransaction();
+
+const walbucket = new Walbucket({
+  gasStrategy: "user-pays",
+  signAndExecuteTransaction: signAndExecuteTransaction,
+});
+```
+
+### 🐛 Bug Fixes
+
+- **Wallet Compatibility**: Eliminates all `signer.toSuiAddress is not a function` errors
+- **Transaction Signing**: Direct wallet communication ensures proper signing flow
+- **Type Safety**: Simplified API reduces type casting and improves DX
+
+### 🔧 Technical Changes
+
+- SDK builds transactions internally, passes to dapp's wallet for signing
+- Removed complex signer detection logic
+- Simplified transaction execution flow
+- Better error messages and debugging
+
+---
+
 ## v0.1.5 - External SuiClient Support (2024-12-01)
 
 ### ✨ New Features
@@ -28,13 +90,13 @@
 ### 📝 Usage Example
 
 ```typescript
-import { useSuiClient } from '@mysten/dapp-kit';
+import { useSuiClient } from "@mysten/dapp-kit";
 
 const suiClient = useSuiClient();
 const walbucket = new Walbucket({
-  apiKey: 'your-api-key',
-  network: 'testnet',
-  gasStrategy: 'user-pays',
+  apiKey: "your-api-key",
+  network: "testnet",
+  gasStrategy: "user-pays",
   userSigner: walletAccount,
   suiClient: suiClient, // Pass dapp's client
 });
