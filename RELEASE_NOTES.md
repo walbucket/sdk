@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.4.1 - Bug Fixes (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- **Type Exports**: Fixed TypeScript type definitions for new file operation methods
+  - Ensured all new methods are properly exported and typed
+  - Fixed compatibility with dapp TypeScript compilation
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@latest
+```
+
+---
+
 ## v0.4.0 - Dual Gas Strategy Support for File Operations (2025-12-01)
 
 ### 🎉 Major Update - New Features
@@ -9,6 +27,7 @@
 ### ✨ New Features
 
 - **File Operations - User-Pays Support**: Added user-pays versions for all file management operations
+
   - `rename()` - Rename assets with user or developer gas
   - `copy()` - Copy assets with user or developer gas
   - `createFolder()` - Create folders with user or developer gas

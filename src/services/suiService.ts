@@ -1188,6 +1188,348 @@ export class SuiService {
   }
 
   /**
+   * Share asset with specific address (user-pays transaction)
+   * Matches contract function: share_asset
+   */
+  async shareAsset(params: {
+    assetId: string;
+    grantedTo: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+    expiresAt?: number; // timestamp in ms, undefined = no expiration
+    passwordHash?: string; // hex string, undefined = no password
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const expiresAtArg = params.expiresAt
+        ? tx.pure.option("u64", params.expiresAt)
+        : tx.pure.option("u64", null);
+
+      const passwordHashArg = params.passwordHash
+        ? tx.pure.option(
+            "vector<u8>",
+            Array.from(
+              Buffer.from(params.passwordHash.replace("0x", ""), "hex")
+            )
+          )
+        : tx.pure.option("vector<u8>", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::share::share_asset`,
+        arguments: [
+          tx.pure.id(params.assetId),
+          tx.pure.address(params.grantedTo),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          expiresAtArg,
+          passwordHashArg,
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to share asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Share asset with specific address (API key-sponsored)
+   * Matches contract function: share_asset_with_api_key
+   */
+  async shareAssetWithApiKey(params: {
+    assetId: string;
+    grantedTo: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+    expiresAt?: number;
+    passwordHash?: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      const expiresAtArg = params.expiresAt
+        ? tx.pure.option("u64", params.expiresAt)
+        : tx.pure.option("u64", null);
+
+      const passwordHashArg = params.passwordHash
+        ? tx.pure.option(
+            "vector<u8>",
+            Array.from(
+              Buffer.from(params.passwordHash.replace("0x", ""), "hex")
+            )
+          )
+        : tx.pure.option("vector<u8>", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::share::share_asset_with_api_key`,
+        arguments: [
+          tx.pure.id(params.assetId),
+          tx.pure.address(params.grantedTo),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          expiresAtArg,
+          passwordHashArg,
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to share asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create shareable link (user-pays transaction)
+   * Matches contract function: create_shareable_link
+   */
+  async createShareableLink(params: {
+    assetId: string;
+    shareToken: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+    expiresAt?: number;
+    passwordHash?: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const shareTokenBytes = Array.from(
+        Buffer.from(params.shareToken, "utf-8")
+      );
+
+      const expiresAtArg = params.expiresAt
+        ? tx.pure.option("u64", params.expiresAt)
+        : tx.pure.option("u64", null);
+
+      const passwordHashArg = params.passwordHash
+        ? tx.pure.option(
+            "vector<u8>",
+            Array.from(
+              Buffer.from(params.passwordHash.replace("0x", ""), "hex")
+            )
+          )
+        : tx.pure.option("vector<u8>", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::share::create_shareable_link`,
+        arguments: [
+          tx.pure.id(params.assetId),
+          tx.pure.vector("u8", shareTokenBytes),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          expiresAtArg,
+          passwordHashArg,
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to create shareable link: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create shareable link (API key-sponsored)
+   * Matches contract function: create_shareable_link_with_api_key
+   */
+  async createShareableLinkWithApiKey(params: {
+    assetId: string;
+    shareToken: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+    expiresAt?: number;
+    passwordHash?: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const shareTokenBytes = Array.from(
+        Buffer.from(params.shareToken, "utf-8")
+      );
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      const expiresAtArg = params.expiresAt
+        ? tx.pure.option("u64", params.expiresAt)
+        : tx.pure.option("u64", null);
+
+      const passwordHashArg = params.passwordHash
+        ? tx.pure.option(
+            "vector<u8>",
+            Array.from(
+              Buffer.from(params.passwordHash.replace("0x", ""), "hex")
+            )
+          )
+        : tx.pure.option("vector<u8>", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::share::create_shareable_link_with_api_key`,
+        arguments: [
+          tx.pure.id(params.assetId),
+          tx.pure.vector("u8", shareTokenBytes),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          expiresAtArg,
+          passwordHashArg,
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to create shareable link: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Revoke share/access grant (user-pays transaction)
+   * Matches contract function: revoke_share
+   */
+  async revokeShare(params: { grantId: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::share::revoke_share`,
+        arguments: [tx.object(params.grantId), tx.object("0x6")], // Clock
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to revoke share: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Revoke share/access grant (API key-sponsored)
+   * Matches contract function: revoke_share_with_api_key
+   */
+  async revokeShareWithApiKey(params: {
+    grantId: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::share::revoke_share_with_api_key`,
+        arguments: [
+          tx.object(params.grantId),
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to revoke share: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * List assets owned by an address
    *
    * Queries the Sui blockchain for all Asset objects owned by the given address.

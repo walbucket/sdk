@@ -1093,6 +1093,291 @@ export class Walbucket {
   }
 
   /**
+   * Share an asset with a specific address
+   *
+   * Creates an access grant for another user to access your asset. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param assetId - Asset ID to share
+   * @param grantedTo - Address of the user receiving access
+   * @param options - Sharing options
+   * @param options.canRead - Allow read access (default: true)
+   * @param options.canWrite - Allow write access (default: false)
+   * @param options.canAdmin - Allow admin access (default: false)
+   * @param options.expiresAt - Expiration timestamp in ms (optional)
+   * @param options.passwordHash - Password hash for protection (optional)
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If sharing fails
+   *
+   * @example
+   * ```typescript
+   * // Share with read-only access
+   * await walbucket.shareAsset('0x...asset', '0x...recipient', {
+   *   canRead: true,
+   *   canWrite: false,
+   *   canAdmin: false
+   * });
+   *
+   * // Share with expiration (7 days)
+   * const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
+   * await walbucket.shareAsset('0x...asset', '0x...recipient', {
+   *   canRead: true,
+   *   expiresAt
+   * });
+   * ```
+   */
+  async shareAsset(
+    assetId: string,
+    grantedTo: string,
+    options: {
+      canRead?: boolean;
+      canWrite?: boolean;
+      canAdmin?: boolean;
+      expiresAt?: number;
+      passwordHash?: string;
+    } = {}
+  ): Promise<void> {
+    try {
+      const {
+        canRead = true,
+        canWrite = false,
+        canAdmin = false,
+        expiresAt,
+        passwordHash,
+      } = options;
+
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.shareAsset({
+          assetId,
+          grantedTo,
+          canRead,
+          canWrite,
+          canAdmin,
+          expiresAt,
+          passwordHash,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.shareAssetWithApiKey({
+          assetId,
+          grantedTo,
+          canRead,
+          canWrite,
+          canAdmin,
+          expiresAt,
+          passwordHash,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Share asset failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create a shareable link for an asset
+   *
+   * Creates a public shareable link that anyone with the link can use to access the asset. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param assetId - Asset ID to create link for
+   * @param options - Link options
+   * @param options.shareToken - Unique token for the link (will be in URL)
+   * @param options.canRead - Allow read access (default: true)
+   * @param options.canWrite - Allow write access (default: false)
+   * @param options.canAdmin - Allow admin access (default: false)
+   * @param options.expiresAt - Expiration timestamp in ms (optional)
+   * @param options.passwordHash - Password hash for protection (optional)
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If link creation fails
+   *
+   * @example
+   * ```typescript
+   * // Create a read-only shareable link
+   * const token = crypto.randomUUID();
+   * await walbucket.createShareableLink('0x...asset', {
+   *   shareToken: token,
+   *   canRead: true
+   * });
+   *
+   * // Link URL would be: https://yourapp.com/share/{token}
+   * ```
+   */
+  async createShareableLink(
+    assetId: string,
+    options: {
+      shareToken: string;
+      canRead?: boolean;
+      canWrite?: boolean;
+      canAdmin?: boolean;
+      expiresAt?: number;
+      passwordHash?: string;
+    }
+  ): Promise<void> {
+    try {
+      const {
+        shareToken,
+        canRead = true,
+        canWrite = false,
+        canAdmin = false,
+        expiresAt,
+        passwordHash,
+      } = options;
+
+      if (!shareToken) {
+        throw new ValidationError("shareToken is required");
+      }
+
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.createShareableLink({
+          assetId,
+          shareToken,
+          canRead,
+          canWrite,
+          canAdmin,
+          expiresAt,
+          passwordHash,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.createShareableLinkWithApiKey({
+          assetId,
+          shareToken,
+          canRead,
+          canWrite,
+          canAdmin,
+          expiresAt,
+          passwordHash,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Create shareable link failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Revoke an access grant or shareable link
+   *
+   * Revokes previously granted access to an asset. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param grantId - ID of the AccessGrant or ShareableLink to revoke
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If revocation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.revokeShare('0x...grantId');
+   * ```
+   */
+  async revokeShare(grantId: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.revokeShare({ grantId });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.revokeShareWithApiKey({
+          grantId,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Revoke share failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * List assets owned by an address
    *
    * Fetches all assets owned by the given address from the Sui blockchain.
