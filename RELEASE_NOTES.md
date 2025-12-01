@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.2 - API Key Validation Fix (2024-12-01)
+
+### 🐛 Bug Fixes
+
+- **API Key Lookup**: Fixed API key validation to properly query blockchain objects by hash
+  - Changed event-based lookup to object-based lookup
+  - Queries all `ApiKeyCreated` events to get API key IDs
+  - Fetches and validates each API key object's hash
+  - Ensures only active API keys are returned
+  - Resolves "API key not found" error when using SDK with valid API keys
+
+### 🔧 Technical Changes
+
+- Updated `findApiKeyObjectId` method in `ApiKeyService` to use `MoveEventType` query
+- Added object fetching and hash comparison for each potential API key
+- Improved error handling for deleted or inaccessible API keys
+
+---
+
 ## v0.1.1 - Asset Listing Feature (2024-12-01)
 
 ### ✨ New Features
