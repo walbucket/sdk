@@ -722,6 +722,13 @@ export class SuiService {
    */
   async listAssets(owner: string): Promise<AssetMetadata[]> {
     try {
+      console.log("[SDK] Listing assets for owner:", owner);
+      console.log("[SDK] Using package ID:", this.packageId);
+      console.log(
+        "[SDK] Asset type filter:",
+        `${this.packageId}::asset::Asset`
+      );
+
       // Query for all objects owned by the address with Asset type filter
       const response = await this.jsonRpcClient.getOwnedObjects({
         owner,
@@ -732,6 +739,12 @@ export class SuiService {
           showContent: true,
           showType: true,
         },
+      });
+
+      console.log("[SDK] getOwnedObjects response:", {
+        count: response.data.length,
+        hasNextPage: response.hasNextPage,
+        data: response.data,
       });
 
       const assets: AssetMetadata[] = [];

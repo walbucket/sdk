@@ -1,6 +1,6 @@
 {
   "name": "@walbucket/sdk",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Walbucket SDK - Cloudinary-like API for decentralized media storage on Sui blockchain",
   "type": "module",
   "main": "./dist/index.js",
