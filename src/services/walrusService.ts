@@ -33,6 +33,11 @@ export class WalrusService {
   private publisherClient: AxiosInstance;
   private aggregatorClient: AxiosInstance;
 
+  // File size limits (based on Walrus documentation and publisher capabilities)
+  // Note: Third-party publishers may have lower limits. Official Walrus publishers support up to 13.3 GiB
+  private static readonly MAX_SINGLE_BLOB_SIZE = 100 * 1024 * 1024; // 100 MB recommended max for single blob
+  private static readonly WALRUS_ABSOLUTE_MAX = 13.3 * 1024 * 1024 * 1024; // 13.3 GiB absolute max
+
   /**
    * Creates a new WalrusService instance
    *
@@ -42,7 +47,9 @@ export class WalrusService {
   constructor(publisherUrl: string, aggregatorUrl: string) {
     this.publisherClient = axios.create({
       baseURL: publisherUrl,
-      timeout: 60000, // 60 seconds for large file uploads
+      timeout: 600000, // 10 minutes default (will be overridden per request)
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
       headers: {
         "Content-Type": "application/octet-stream",
       },
@@ -50,11 +57,56 @@ export class WalrusService {
 
     this.aggregatorClient = axios.create({
       baseURL: aggregatorUrl,
-      timeout: 60000,
+      timeout: 300000, // 5 minutes for downloads
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
       headers: {
         Accept: "application/octet-stream",
       },
     });
+  }
+
+  /**
+   * Calculate appropriate timeout based on file size
+   * Larger files need more time to upload
+   */
+  private calculateTimeout(bytes: number): number {
+    const MB = bytes / (1024 * 1024);
+
+    if (MB < 1) return 30000; // 30 seconds for < 1MB
+    if (MB < 5) return 60000; // 1 minute for < 5MB
+    if (MB < 10) return 120000; // 2 minutes for < 10MB
+    if (MB < 50) return 300000; // 5 minutes for < 50MB
+    if (MB < 100) return 600000; // 10 minutes for < 100MB
+    return 900000; // 15 minutes for larger files
+  }
+
+  /**
+   * Validate file size before upload
+   * @throws {NetworkError} If file exceeds maximum size
+   */
+  private validateFileSize(bytes: number): void {
+    if (bytes > WalrusService.MAX_SINGLE_BLOB_SIZE) {
+      const sizeMB = (bytes / (1024 * 1024)).toFixed(2);
+      const maxMB = (
+        WalrusService.MAX_SINGLE_BLOB_SIZE /
+        (1024 * 1024)
+      ).toFixed(0);
+      throw new NetworkErrorClass(
+        `File size (${sizeMB} MB) exceeds maximum single blob size (${maxMB} MB). ` +
+          `Large files require chunking. Please upload files smaller than ${maxMB} MB or implement chunked upload.`,
+        413 // Request Entity Too Large
+      );
+    }
+
+    if (bytes > WalrusService.WALRUS_ABSOLUTE_MAX) {
+      const sizeGB = (bytes / (1024 * 1024 * 1024)).toFixed(2);
+      throw new NetworkErrorClass(
+        `File size (${sizeGB} GB) exceeds Walrus maximum blob size (13.3 GB). ` +
+          `Files this large must be split into multiple blobs.`,
+        413
+      );
+    }
   }
 
   /**
@@ -66,6 +118,7 @@ export class WalrusService {
    * @param data - File data as Buffer or Uint8Array
    * @param options - Upload options
    * @param options.permanent - If true, creates a permanent blob that cannot be deleted (default: false)
+   * @param options.onProgress - Optional callback for upload progress
    *
    * @returns Blob ID that can be used to retrieve the file
    *
@@ -78,20 +131,42 @@ export class WalrusService {
    *
    * // Upload permanent blob
    * const permanentBlobId = await walrusService.upload(data, { permanent: true });
+   *
+   * // Upload with progress tracking
+   * const blobId = await walrusService.upload(data, {
+   *   onProgress: (progress) => console.log(`${progress.percentage}%`)
+   * });
    * ```
    */
   async upload(
     data: Buffer | Uint8Array,
     options?: {
       permanent?: boolean;
+      onProgress?: (progress: {
+        loaded: number;
+        total: number;
+        percentage: number;
+      }) => void;
     }
   ): Promise<string> {
     try {
+      const fileSize = data.length;
+      const sizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+
+      // Log file size for debugging
+      console.log(`[Walrus] Uploading file: ${sizeMB} MB`);
+
+      // Validate file size
+      this.validateFileSize(fileSize);
+
       // Build URL with epochs parameter (default to 5 epochs for testnet)
       const params = new URLSearchParams();
       params.append("epochs", "5");
 
       const url = `/v1/blobs?${params.toString()}`;
+
+      // Calculate dynamic timeout based on file size
+      const timeout = this.calculateTimeout(fileSize);
 
       const response = await this.publisherClient.put<{
         newlyCreated?: {
@@ -111,7 +186,21 @@ export class WalrusService {
       }>(url, data, {
         headers: {
           "Content-Type": "application/octet-stream",
-          // Don't set Content-Length - axios will set it automatically
+        },
+        timeout,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        onUploadProgress: (progressEvent) => {
+          if (options?.onProgress && progressEvent.total) {
+            const percentage = Math.round(
+              (progressEvent.loaded / progressEvent.total) * 100
+            );
+            options.onProgress({
+              loaded: progressEvent.loaded,
+              total: progressEvent.total,
+              percentage,
+            });
+          }
         },
       });
 
@@ -128,12 +217,28 @@ export class WalrusService {
       // Remove 0x prefix if present
       const cleanBlobId = blobId.startsWith("0x") ? blobId.slice(2) : blobId;
 
+      console.log(`[Walrus] Upload successful: ${cleanBlobId}`);
+
       return cleanBlobId;
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const sizeMB = (data.length / (1024 * 1024)).toFixed(2);
+
+        // Handle 413 specifically
+        if (status === 413) {
+          throw new NetworkErrorClass(
+            `File upload rejected by Walrus server (${sizeMB} MB). ` +
+              `The publisher endpoint may have a lower size limit than expected. ` +
+              `Try using a different Walrus publisher or reduce file size.`,
+            413,
+            error
+          );
+        }
+
         throw new NetworkErrorClass(
           `Walrus upload failed: ${error.message}`,
-          error.response?.status,
+          status,
           error
         );
       }

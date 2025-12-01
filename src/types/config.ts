@@ -113,7 +113,7 @@ export const DEFAULT_WALRUS_URLS: Record<
   { publisher: string; aggregator: string }
 > = {
   testnet: {
-    publisher: "https://publisher.walrus-01.tududes.com",
+    publisher: "https://publisher.walrus-testnet.walrus.space",
     aggregator: "https://aggregator.walrus-testnet.walrus.space",
   },
   mainnet: {
@@ -121,7 +121,7 @@ export const DEFAULT_WALRUS_URLS: Record<
     aggregator: "https://aggregator.mainnet.walrus.space",
   },
   devnet: {
-    publisher: "https://publisher.walrus-01.tududes.com",
+    publisher: "https://publisher.walrus-testnet.walrus.space",
     aggregator: "https://aggregator.walrus-testnet.walrus.space",
   },
   localnet: {

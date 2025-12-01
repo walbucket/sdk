@@ -1,5 +1,39 @@
 # Release Notes
 
+## v0.4.2 - Large File Upload Fixes (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- **Fixed 413 Request Entity Too Large errors**: Switched from third-party `tududes.com` publisher to official Walrus testnet publisher
+  - Third-party publishers were rejecting files as small as 1.46MB
+  - Official publisher supports up to 13.3 GiB
+  - Updated default endpoints for testnet and devnet networks
+
+### ✨ Enhancements
+
+- **Dynamic Timeout Calculation**: Upload timeout now scales with file size (30s - 15min)
+- **Upload Progress Tracking**: Added optional `onProgress` callback to monitor upload progress
+- **Better Error Messages**: Enhanced error messages for 413 errors with specific guidance
+- **File Size Validation**: Pre-upload validation with clear error messages
+- **Increased Limits**: Max single blob size increased from 10MB to 100MB
+
+### 🔧 Technical Changes
+
+- Added `maxBodyLength: Infinity` and `maxContentLength: Infinity` to axios clients
+- Implemented `calculateTimeout()` method for dynamic timeouts
+- Implemented `validateFileSize()` method for pre-upload validation
+- Enhanced upload logging for debugging
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.4.2
+```
+
+---
+
 ## v0.4.1 - Bug Fixes (2025-12-01)
 
 ### 🐛 Bug Fixes
