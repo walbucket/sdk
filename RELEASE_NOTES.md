@@ -1,5 +1,48 @@
 # Release Notes
 
+## v0.2.1 - Transaction Sender Fix (2024-12-01)
+
+### 🐛 Bug Fixes
+
+- **Transaction Sender**: Fixed "Transaction was not signed by the correct sender" error
+  - Added `userAddress` parameter to SDK configuration
+  - SDK now calls `tx.setSender(userAddress)` to properly attribute transactions
+  - Allows users to pay gas while using developer's API key objects
+  - Resolves sender address mismatch when wallet signs transactions
+
+### 🔧 Technical Changes
+
+- Added optional `userAddress?: string` field to `WalbucketConfig`
+- Updated `SuiService` constructor to accept `userAddress` parameter
+- Modified `createAsset` to set transaction sender before signing
+- Added validation: `userAddress` required when `gasStrategy` is `'user-pays'`
+- Dapp integration now passes `currentAccount.address` from `useCurrentAccount()` hook
+
+### 📝 Migration Guide
+
+Update your SDK initialization to include the user's address:
+
+```typescript
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
+
+const currentAccount = useCurrentAccount();
+const { mutateAsync: signAndExecuteTransaction } =
+  useSignAndExecuteTransaction();
+
+const walbucket = await createWalbucket({
+  apiKey: "your-api-key",
+  network: "testnet",
+  gasStrategy: "user-pays",
+  signAndExecuteTransaction: signAndExecuteTransaction,
+  userAddress: currentAccount.address, // ✅ Add this
+});
+```
+
+---
+
 ## v0.2.0 - SignAndExecuteTransaction Function API (2024-12-01)
 
 ### 🎉 Major Update - Breaking Changes
