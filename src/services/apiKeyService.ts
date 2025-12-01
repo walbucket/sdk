@@ -1,8 +1,8 @@
-import { SuiGrpcClient } from '@mysten/sui/grpc';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import type { ApiKeyData } from '../types/responses.js';
-import { BlockchainError, ValidationError } from '../types/errors.js';
-import crypto from 'crypto';
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import type { ApiKeyData } from "../types/responses.js";
+import { BlockchainError, ValidationError } from "../types/errors.js";
+import crypto from "crypto";
 
 /**
  * Permission flags (matches contract constants)
@@ -16,29 +16,33 @@ export const PERMISSION_ADMIN = 16;
 
 /**
  * API Key Service
- * 
+ *
  * Handles on-chain API key validation and permission checking.
  * Validates API keys by querying the Sui blockchain and checks permissions
  * using bit flags that match the contract implementation.
- * 
+ *
+ * Note: ApiKey and DeveloperAccount are shared objects (v0.3.0+), allowing
+ * any user to reference them in transactions while maintaining access control
+ * through on-chain validation.
+ *
  * Features:
  * - On-chain validation via Sui blockchain queries
  * - Permission checking (upload, read, delete, transform, admin)
  * - Caching to reduce blockchain queries
- * - Developer account ID resolution
- * 
+ * - Developer account ID resolution via events
+ *
  * @example
  * ```typescript
  * const apiKeyService = new ApiKeyService(grpcClient, 3600, 'testnet');
- * 
+ *
  * // Validate API key
  * const apiKeyData = await apiKeyService.validateApiKey(apiKey, packageId);
- * 
+ *
  * // Check permissions
  * if (apiKeyService.hasPermission(apiKeyData, PERMISSION_UPLOAD)) {
  *   // User has upload permission
  * }
- * 
+ *
  * // Get developer account ID
  * const devAccountId = await apiKeyService.getDeveloperAccountId(address, packageId);
  * ```
@@ -46,15 +50,20 @@ export const PERMISSION_ADMIN = 16;
 export class ApiKeyService {
   private grpcClient: SuiGrpcClient;
   private jsonRpcClient: SuiClient;
-  private cache: Map<string, { data: ApiKeyData; expiresAt: number }> = new Map();
+  private cache: Map<string, { data: ApiKeyData; expiresAt: number }> =
+    new Map();
   private cacheTTL: number;
   private network: string;
 
-  constructor(client: SuiGrpcClient, cacheTTL: number = 3600, network: string = 'testnet') {
+  constructor(
+    client: SuiGrpcClient,
+    cacheTTL: number = 3600,
+    network: string = "testnet"
+  ) {
     this.grpcClient = client;
     this.network = network;
     this.cacheTTL = cacheTTL * 1000; // Convert to milliseconds
-    
+
     // Use JSON-RPC for queries (more stable)
     this.jsonRpcClient = new SuiClient({
       url: getFullnodeUrl(network as any),
@@ -63,23 +72,23 @@ export class ApiKeyService {
 
   /**
    * Validate API key on-chain
-   * 
+   *
    * Validates an API key by querying the Sui blockchain. Checks:
    * - API key hash matches
    * - API key is active
    * - API key has not expired
-   * 
+   *
    * Results are cached to reduce blockchain queries.
-   * 
+   *
    * @param apiKey - The API key string to validate
    * @param packageId - Package ID of the deployed contract
    * @param apiKeyId - Optional API key object ID (if known, skips lookup)
-   * 
+   *
    * @returns API key data including permissions, expiration, and developer address
-   * 
+   *
    * @throws {ValidationError} If API key is invalid, expired, or inactive
    * @throws {BlockchainError} If blockchain query fails
-   * 
+   *
    * @example
    * ```typescript
    * const apiKeyData = await apiKeyService.validateApiKey('your-api-key', packageId);
@@ -87,7 +96,11 @@ export class ApiKeyService {
    * console.log('Expires:', new Date(apiKeyData.expiration));
    * ```
    */
-  async validateApiKey(apiKey: string, packageId: string, apiKeyId?: string): Promise<ApiKeyData> {
+  async validateApiKey(
+    apiKey: string,
+    packageId: string,
+    apiKeyId?: string
+  ): Promise<ApiKeyData> {
     // Check cache first
     const cacheKey = this.getCacheKey(apiKey);
     const cached = this.cache.get(cacheKey);
@@ -98,7 +111,7 @@ export class ApiKeyService {
     try {
       // Hash API key for lookup
       const apiKeyHash = this.hashApiKey(apiKey);
-      
+
       // Find API key object by querying events or using a registry
       // For now, we'll need to find the API key object ID
       // This is a simplified approach - in production, you might have a registry
@@ -106,9 +119,9 @@ export class ApiKeyService {
       if (!keyId) {
         keyId = await this.findApiKeyObjectId(apiKeyHash, packageId);
       }
-      
+
       if (!keyId) {
-        throw new ValidationError('API key not found');
+        throw new ValidationError("API key not found");
       }
 
       // Get API key object from Sui using JSON-RPC
@@ -119,8 +132,8 @@ export class ApiKeyService {
         },
       });
 
-      if (!object.data || !('content' in object.data)) {
-        throw new ValidationError('API key object not found');
+      if (!object.data || !("content" in object.data)) {
+        throw new ValidationError("API key object not found");
       }
 
       const content = object.data.content as any;
@@ -129,7 +142,7 @@ export class ApiKeyService {
       // Verify hash matches
       const storedHash = this.bytesToString(fields.api_key_hash || []);
       if (storedHash !== apiKeyHash) {
-        throw new ValidationError('Invalid API key hash');
+        throw new ValidationError("Invalid API key hash");
       }
 
       const currentTime = Date.now();
@@ -137,18 +150,18 @@ export class ApiKeyService {
 
       // Check if expired
       if (expiresAt > 0 && currentTime >= expiresAt) {
-        throw new ValidationError('API key has expired');
+        throw new ValidationError("API key has expired");
       }
 
       // Check if active
       if (!fields.is_active) {
-        throw new ValidationError('API key is not active');
+        throw new ValidationError("API key is not active");
       }
 
       const apiKeyData: ApiKeyData = {
         keyId,
-        developerAddress: fields.developer_address || '',
-        name: fields.name || '',
+        developerAddress: fields.developer_address || "",
+        name: fields.name || "",
         permissions: Number(fields.permissions || 0),
         rateLimit: Number(fields.rate_limit || 0),
         createdAt: Number(fields.created_at || 0) * 1000,
@@ -170,7 +183,9 @@ export class ApiKeyService {
         throw error;
       }
       throw new BlockchainError(
-        `Failed to validate API key: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to validate API key: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -187,34 +202,35 @@ export class ApiKeyService {
 
   /**
    * Get developer account ID from developer address
-   * Uses owned objects lookup to find DeveloperAccount
+   * Uses event lookup to find DeveloperAccount (shared object)
    */
   async getDeveloperAccountId(
     developerAddress: string,
     packageId: string
   ): Promise<string | null> {
     try {
-      // List owned objects of type DeveloperAccount
-      const accountType = `${packageId}::apikey::DeveloperAccount`;
-      
-      // Use JSON-RPC for owned objects query
-      const objects = await this.jsonRpcClient.getOwnedObjects({
-        owner: developerAddress,
-        filter: {
-          StructType: accountType,
+      // Query DeveloperAccountCreated events to find the account for this developer
+      const events = await this.jsonRpcClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::events::DeveloperAccountCreated`,
         },
-        options: {
-          showType: true,
-        },
-        limit: 10,
+        limit: 100,
+        order: "descending",
       });
 
-      if (!objects.data || objects.data.length === 0) {
+      if (!events.data || events.data.length === 0) {
         return null;
       }
 
-      // Return the first DeveloperAccount found (should be only one per address)
-      return objects.data[0].data?.objectId || null;
+      // Find the event for this developer's address
+      for (const event of events.data) {
+        const parsedJson = event.parsedJson as any;
+        if (parsedJson?.owner === developerAddress) {
+          return parsedJson?.account_id || null;
+        }
+      }
+
+      return null;
     } catch (error) {
       return null;
     }
@@ -224,7 +240,7 @@ export class ApiKeyService {
    * Hash API key (SHA-256)
    */
   private hashApiKey(apiKey: string): string {
-    return crypto.createHash('sha256').update(apiKey).digest('hex');
+    return crypto.createHash("sha256").update(apiKey).digest("hex");
   }
 
   /**
@@ -243,7 +259,7 @@ export class ApiKeyService {
           MoveEventType: `${packageId}::events::ApiKeyCreated`,
         },
         limit: 1000, // May need pagination for production
-        order: 'descending', // Get most recent first
+        order: "descending", // Get most recent first
       });
 
       if (!events.data || events.data.length === 0) {
@@ -254,7 +270,7 @@ export class ApiKeyService {
       for (const event of events.data) {
         const parsedJson = event.parsedJson as any;
         const apiKeyId = parsedJson?.api_key_id;
-        
+
         if (!apiKeyId) {
           continue;
         }
@@ -268,11 +284,11 @@ export class ApiKeyService {
             },
           });
 
-          if (object.data && 'content' in object.data) {
+          if (object.data && "content" in object.data) {
             const content = object.data.content as any;
             const fields = content.fields || {};
             const storedHash = this.bytesToString(fields.api_key_hash || []);
-            
+
             // Check if this is the API key we're looking for
             if (storedHash === apiKeyHash && fields.is_active) {
               return apiKeyId;
@@ -302,9 +318,9 @@ export class ApiKeyService {
    */
   private bytesToString(bytes: number[] | Uint8Array): string {
     if (Array.isArray(bytes)) {
-      return Buffer.from(bytes).toString('hex');
+      return Buffer.from(bytes).toString("hex");
     }
-    return Buffer.from(bytes).toString('hex');
+    return Buffer.from(bytes).toString("hex");
   }
 
   /**
