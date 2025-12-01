@@ -8,7 +8,6 @@
   - Removed `tx.setSender()` call to allow Sui to infer sender from transaction signature
   - Any user can now upload files using developer's API key (as intended)
   - API key and developer account objects can be referenced by any transaction
-  
 - **Asset ID Extraction**: Fixed "Failed to get asset ID from transaction" error
   - Added `options` parameter to `SignAndExecuteTransaction` type for requesting transaction effects
   - SDK now passes `showEffects`, `showObjectChanges`, and `showEvents` options to wallet

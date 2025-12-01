@@ -243,8 +243,8 @@ export class SuiService {
         // If effects are not immediately available, wait and query the transaction
         if (!result.effects && result.digest) {
           // Wait a bit for indexing
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
           // Query transaction result
           const txResult = await this.jsonRpcClient.waitForTransaction({
             digest: result.digest,
@@ -281,7 +281,7 @@ export class SuiService {
       // Fallback: try objectChanges if effects.created is not available
       if (result.objectChanges) {
         const createdObjects = result.objectChanges.filter(
-          (change: any) => change.type === 'created'
+          (change: any) => change.type === "created"
         );
         if (createdObjects.length > 0) {
           const assetId = createdObjects[0].objectId;
