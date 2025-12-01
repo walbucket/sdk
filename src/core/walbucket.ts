@@ -714,36 +714,41 @@ export class Walbucket {
     try {
       let queryAddress = owner;
 
-      // If no owner provided, use signer's address
+      // If no owner provided, try to determine from config or signer
       if (!queryAddress) {
-        if (!this.signer) {
-          throw new ValidationError(
-            "No owner address provided and no signer available"
-          );
+        // First try userAddress from config (user-pays mode)
+        if (this.config.userAddress) {
+          queryAddress = this.config.userAddress;
         }
-
-        // Get address from signer
-        // The signer should have a method to get the address
-        // For Ed25519Keypair, it's getPublicKey().toSuiAddress()
-        // For wallet signers from dapp-kit, the address is in the account object
-        if ("address" in this.signer) {
-          queryAddress = this.signer.address as string;
-        } else if (
-          "getPublicKey" in this.signer &&
-          typeof this.signer.getPublicKey === "function"
-        ) {
-          const publicKey = this.signer.getPublicKey();
-          if (
-            publicKey &&
-            "toSuiAddress" in publicKey &&
-            typeof publicKey.toSuiAddress === "function"
+        // Then try signer (developer-sponsored mode)
+        else if (this.signer) {
+          // Get address from signer
+          // The signer should have a method to get the address
+          // For Ed25519Keypair, it's getPublicKey().toSuiAddress()
+          // For wallet signers from dapp-kit, the address is in the account object
+          if ("address" in this.signer) {
+            queryAddress = this.signer.address as string;
+          } else if (
+            "getPublicKey" in this.signer &&
+            typeof this.signer.getPublicKey === "function"
           ) {
-            queryAddress = publicKey.toSuiAddress();
+            const publicKey = this.signer.getPublicKey();
+            if (
+              publicKey &&
+              "toSuiAddress" in publicKey &&
+              typeof publicKey.toSuiAddress === "function"
+            ) {
+              queryAddress = publicKey.toSuiAddress();
+            } else {
+              throw new ValidationError("Unable to get address from signer");
+            }
           } else {
             throw new ValidationError("Unable to get address from signer");
           }
         } else {
-          throw new ValidationError("Unable to get address from signer");
+          throw new ValidationError(
+            "No owner address provided and no signer or userAddress available"
+          );
         }
       }
 
