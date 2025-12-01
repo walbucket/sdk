@@ -229,40 +229,58 @@ export class ApiKeyService {
 
   /**
    * Find API key object ID by hash
-   * Queries events for ApiKeyCreated events (similar to backend approach)
-   * Note: This is inefficient for production - consider using a registry or database
+   * Queries all ApiKey objects and checks their hashes
+   * Note: This requires checking multiple objects - consider caching or using a registry
    */
   private async findApiKeyObjectId(
     apiKeyHash: string,
     packageId: string
   ): Promise<string | null> {
     try {
-      // Query events for ApiKeyCreated using JSON-RPC
+      // First, get all ApiKeyCreated events to find potential API key IDs
       const events = await this.jsonRpcClient.queryEvents({
         query: {
-          MoveModule: {
-            package: packageId,
-            module: 'apikey',
-          },
+          MoveEventType: `${packageId}::events::ApiKeyCreated`,
         },
         limit: 1000, // May need pagination for production
+        order: 'descending', // Get most recent first
       });
 
-      if (!events.data) {
+      if (!events.data || events.data.length === 0) {
         return null;
       }
 
-      // Search through events to find matching hash
+      // Check each API key object to find one with matching hash
       for (const event of events.data) {
-        if (event.type?.includes('ApiKeyCreated')) {
-          const parsedJson = event.parsedJson as any;
-          if (parsedJson?.api_key_hash) {
-            // Compare hashes (convert to hex if needed)
-            const eventHash = Buffer.from(parsedJson.api_key_hash).toString('hex');
-            if (eventHash === apiKeyHash) {
-              return parsedJson.api_key_id || null;
+        const parsedJson = event.parsedJson as any;
+        const apiKeyId = parsedJson?.api_key_id;
+        
+        if (!apiKeyId) {
+          continue;
+        }
+
+        try {
+          // Get the API key object and check its hash
+          const object = await this.jsonRpcClient.getObject({
+            id: apiKeyId,
+            options: {
+              showContent: true,
+            },
+          });
+
+          if (object.data && 'content' in object.data) {
+            const content = object.data.content as any;
+            const fields = content.fields || {};
+            const storedHash = this.bytesToString(fields.api_key_hash || []);
+            
+            // Check if this is the API key we're looking for
+            if (storedHash === apiKeyHash && fields.is_active) {
+              return apiKeyId;
             }
           }
+        } catch (error) {
+          // Skip this API key if we can't fetch it (might be deleted)
+          continue;
         }
       }
 
