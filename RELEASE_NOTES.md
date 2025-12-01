@@ -1,5 +1,102 @@
 # Release Notes
 
+## v0.3.1 - Shared Object API Key Lookup Fix (2025-01-30)
+
+### 🐛 Bug Fixes
+
+- **API Key Service**: Fixed `getDeveloperAccountId()` to work with shared DeveloperAccount objects
+  - Changed from `getOwnedObjects()` to event-based lookup using `DeveloperAccountCreated` events
+  - Queries events and filters by owner address to find developer accounts
+  - Compatible with new shared object architecture (v0.3.0+)
+
+### 🔧 Technical Changes
+
+- Updated `getDeveloperAccountId()` method to query blockchain events instead of owned objects
+- Improved documentation to clarify shared object architecture
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade from v0.3.0:
+
+```bash
+pnpm add @walbucket/sdk@latest
+```
+
+---
+
+## v0.3.0 - Shared Objects for B2C Platform (2025-01-30)
+
+### 🎉 Major Update - Breaking Changes
+
+**BREAKING**: ApiKey and DeveloperAccount are now shared objects instead of owned objects. This enables true B2C functionality where any user can upload files using a developer's API key.
+
+### ✨ New Features
+
+- **Shared Object Architecture**: ApiKey and DeveloperAccount converted to shared objects
+  - Any user can reference API keys in transactions (not just the developer)
+  - Enables multi-user B2C platforms where end users upload files
+  - Developer retains ownership and management control through on-chain validation
+  - Solves "Transaction was not signed by the correct sender" error permanently
+
+### 🔄 Breaking Changes
+
+- **New Contract Package ID**: `0x52b1196bdce066f48bdb66d16c516bb618d4daa34f4fdad77caba426d0c03795`
+  - Old package: `0x1f520a412cee6d8fb76f66bb749e1e14b2476375bc7c892d103c82f6cedf0d85`
+  - Must recreate developer accounts and API keys with new contract
+  - Existing API keys from old contract will not work
+
+### 🐛 Bug Fixes
+
+- **Multi-User Support**: Fixed ownership errors preventing end users from uploading
+  - Users can now reference developer's API keys without ownership conflicts
+  - Transaction sender can be anyone, not just the API key owner
+  - Proper B2C functionality where developer provides infrastructure, users pay gas
+
+### 🔧 Technical Changes
+
+- Contract changes: `ApiKey` and `DeveloperAccount` use `transfer::share_object()` instead of `transfer::transfer()`
+- Removed `store` ability from both structs (shared objects don't need `store`)
+- Updated DEFAULT_PACKAGE_IDS in SDK configuration
+- Contract maintains access control through internal validation
+
+### 📝 Migration Guide
+
+**Step 1: Update SDK**
+
+```bash
+pnpm add @walbucket/sdk@0.3.0
+```
+
+**Step 2: Recreate Developer Account**
+
+The old developer account is an owned object and won't work with the new contract. Create a new one:
+
+```typescript
+const walbucket = new Walbucket({ network: "testnet" });
+const account = await walbucket.createDeveloperAccount("My Account");
+```
+
+**Step 3: Recreate API Keys**
+
+Create new API keys with the new developer account:
+
+```typescript
+const apiKey = await walbucket.createApiKey("Production Key", accountId);
+```
+
+**Step 4: Update Environment Variables**
+
+Update your `.env` with new IDs from Step 2 and 3.
+
+### 🎯 What This Enables
+
+1. **True B2C Platform**: Developers provide API keys, end users upload files
+2. **User-Pays Gas**: End users pay their own gas fees
+3. **Scalability**: No ownership bottlenecks for multi-user applications
+4. **Developer Control**: Developers still own and manage API keys on-chain
+
+---
+
 ## v0.2.3 - Debug Logging and Transaction Wait Fix (2024-12-01)
 
 ### 🐛 Bug Fixes
