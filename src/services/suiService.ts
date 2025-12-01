@@ -228,32 +228,54 @@ export class SuiService {
 
       // Build and sign transaction
       let result: any;
+      let digest: string | undefined;
 
       if (this.signAndExecuteFn) {
         // User-pays mode: use provided signAndExecuteTransaction function
-        result = await this.signAndExecuteFn({
-          transaction: tx,
-          options: {
-            showEffects: true,
-            showObjectChanges: true,
-            showEvents: true,
-          },
-        });
-
-        // If effects are not immediately available, wait and query the transaction
-        if (!result.effects && result.digest) {
-          // Wait a bit for indexing
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          // Query transaction result
-          const txResult = await this.jsonRpcClient.waitForTransaction({
-            digest: result.digest,
-            options: {
-              showEffects: true,
-              showObjectChanges: true,
-            },
+        try {
+          result = await this.signAndExecuteFn({
+            transaction: tx,
           });
-          result = txResult;
+
+          // Extract digest from various possible response formats
+          digest = result.digest || result.effects?.transactionDigest;
+
+          console.log('[SDK] Transaction executed, digest:', digest);
+          console.log('[SDK] Initial result structure:', {
+            hasEffects: !!result.effects,
+            hasObjectChanges: !!result.objectChanges,
+            hasDigest: !!digest,
+            effectsKeys: result.effects ? Object.keys(result.effects) : [],
+          });
+
+          // Always query the transaction to get complete data
+          if (digest) {
+            console.log('[SDK] Waiting for transaction to be indexed...');
+            // Wait longer for transaction indexing (3 seconds)
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            console.log('[SDK] Querying transaction result...');
+            const txResult = await this.jsonRpcClient.waitForTransaction({
+              digest: digest,
+              options: {
+                showEffects: true,
+                showObjectChanges: true,
+                showEvents: true,
+              },
+            });
+            
+            console.log('[SDK] Transaction result received:', {
+              hasEffects: !!txResult.effects,
+              hasObjectChanges: !!txResult.objectChanges,
+              effectsStatus: txResult.effects?.status,
+              objectChangesCount: txResult.objectChanges?.length || 0,
+            });
+            
+            result = txResult;
+          }
+        } catch (error) {
+          console.error('[SDK] Error during transaction execution:', error);
+          throw error;
         }
       } else {
         // Developer-sponsored mode: use keypair signer with internal client
@@ -262,16 +284,20 @@ export class SuiService {
           signer: params.signer,
           options: {
             showEffects: true,
+            showObjectChanges: true,
             showEvents: true,
           },
         });
+        digest = result.digest || result.effects?.transactionDigest;
       }
 
       // Extract asset ID from created objects in effects
       if (result.effects?.created) {
         const created = result.effects.created;
+        console.log('[SDK] Found created objects in effects:', created.length);
         if (created && created.length > 0) {
           const assetId = created[0].reference?.objectId;
+          console.log('[SDK] Extracted asset ID from effects.created:', assetId);
           if (assetId) {
             return assetId;
           }
@@ -280,18 +306,35 @@ export class SuiService {
 
       // Fallback: try objectChanges if effects.created is not available
       if (result.objectChanges) {
+        console.log('[SDK] Checking objectChanges, count:', result.objectChanges.length);
         const createdObjects = result.objectChanges.filter(
-          (change: any) => change.type === "created"
+          (change: any) => {
+            console.log('[SDK] ObjectChange:', { type: change.type, objectType: change.objectType });
+            return change.type === "created";
+          }
         );
+        console.log('[SDK] Found created objects in objectChanges:', createdObjects.length);
         if (createdObjects.length > 0) {
           const assetId = createdObjects[0].objectId;
+          console.log('[SDK] Extracted asset ID from objectChanges:', assetId);
           if (assetId) {
             return assetId;
           }
         }
       }
 
-      throw new BlockchainError("Failed to get asset ID from transaction");
+      // If we still don't have the asset ID, log detailed info
+      console.error('[SDK] Failed to extract asset ID. Full result:', JSON.stringify({
+        digest,
+        hasEffects: !!result.effects,
+        hasObjectChanges: !!result.objectChanges,
+        effects: result.effects,
+        objectChanges: result.objectChanges,
+      }, null, 2));
+
+      throw new BlockchainError(
+        `Failed to get asset ID from transaction. Digest: ${digest || 'unknown'}`
+      );
     } catch (error) {
       throw new BlockchainError(
         `Failed to create asset: ${
