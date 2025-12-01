@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.4 - Wallet Signer Support (2024-12-01)
+
+### 🐛 Bug Fixes
+
+- **Browser Wallet Support**: Fixed `signer.toSuiAddress is not a function` error when using browser wallets
+  - Added detection for wallet signers with `signAndExecuteTransaction` method
+  - Properly routes transaction signing to wallet or keypair based on signer type
+  - Wallet signers now use their own `signAndExecuteTransaction` method
+  - Keypair signers continue using `SuiClient.signAndExecuteTransaction`
+  - Resolves upload failures when using Sui Wallet, Suiet, or other browser wallets
+
+### 🔧 Technical Changes
+
+- Updated `SuiService.createAsset` to detect signer type at runtime
+- Added client parameter passing for wallet-based transaction execution
+- Improved compatibility with `@mysten/dapp-kit` wallet integration
+
+---
+
 ## v0.1.3 - Walrus API Fix (2024-12-01)
 
 ### 🐛 Bug Fixes
