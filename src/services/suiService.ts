@@ -14,12 +14,14 @@ import { getSuiGrpcUrl } from "../utils/config.js";
 export class SuiService {
   private grpcClient: SuiGrpcClient;
   private jsonRpcClient: SuiClient; // Fallback for queries that work better with JSON-RPC
+  private externalClient: SuiClient | null; // External client for wallet transactions
   private packageId: string;
   private network: SuiNetwork;
 
-  constructor(network: SuiNetwork, packageId: string) {
+  constructor(network: SuiNetwork, packageId: string, externalClient?: SuiClient) {
     this.network = network;
     this.packageId = packageId;
+    this.externalClient = externalClient || null;
 
     // Initialize gRPC client for transactions
     this.grpcClient = new SuiGrpcClient({
@@ -221,13 +223,14 @@ export class SuiService {
         "signAndExecuteTransaction" in params.signer &&
         typeof params.signer.signAndExecuteTransaction === "function"
       ) {
-        // Wallet signer - pass transaction and client
+        // Wallet signer - use external client if provided, otherwise internal
+        const clientToUse = this.externalClient || this.jsonRpcClient;
         result = await params.signer.signAndExecuteTransaction({
           transaction: tx,
-          client: this.jsonRpcClient,
+          client: clientToUse,
         });
       } else {
-        // Keypair signer - use SuiClient's signAndExecuteTransaction
+        // Keypair signer - use internal SuiClient's signAndExecuteTransaction
         result = await this.jsonRpcClient.signAndExecuteTransaction({
           transaction: tx,
           signer: params.signer,

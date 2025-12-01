@@ -1,4 +1,5 @@
 import type { Signer } from '@mysten/sui/cryptography';
+import type { SuiClient } from '@mysten/sui/client';
 
 /**
  * Sui network identifier
@@ -31,6 +32,14 @@ export interface WalbucketConfig {
   
   /** User signer for user-pays gas (required if gasStrategy is 'user-pays') */
   userSigner?: Signer;
+  
+  /** 
+   * Optional SuiClient instance for wallet transaction signing
+   * Only used when gasStrategy is 'user-pays'
+   * If provided, will be used for wallet signAndExecuteTransaction calls
+   * Useful for browser wallets that need the dapp's SuiClient context
+   */
+  suiClient?: SuiClient;
   
   /** 
    * Package ID (auto-detected from network if not provided)

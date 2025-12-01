@@ -113,9 +113,12 @@ export class Walbucket {
     this.config = validateConfig(config) as Required<WalbucketConfig>;
 
     // Initialize Sui service
+    // Pass external client only for user-pays strategy (wallet transactions)
+    const externalClient = this.config.gasStrategy === 'user-pays' ? this.config.suiClient : undefined;
     this.suiService = new SuiService(
       this.config.network,
-      this.config.packageId
+      this.config.packageId,
+      externalClient
     );
 
     // Initialize Walrus service
