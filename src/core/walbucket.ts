@@ -118,10 +118,15 @@ export class Walbucket {
       this.config.gasStrategy === "user-pays"
         ? this.config.signAndExecuteTransaction
         : undefined;
+    const userAddress =
+      this.config.gasStrategy === "user-pays"
+        ? this.config.userAddress
+        : undefined;
     this.suiService = new SuiService(
       this.config.network,
       this.config.packageId,
-      signAndExecuteFn
+      signAndExecuteFn,
+      userAddress
     );
 
     // Initialize Walrus service

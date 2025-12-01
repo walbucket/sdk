@@ -30,6 +30,12 @@ export function validateConfig(config: WalbucketConfig): WalbucketConfig {
     );
   }
 
+  if (gasStrategy === "user-pays" && !config.userAddress) {
+    throw new ConfigurationError(
+      'userAddress is required when gasStrategy is "user-pays"'
+    );
+  }
+
   // Auto-detect package ID from network if not provided
   const packageId = config.packageId || DEFAULT_PACKAGE_IDS[network];
 

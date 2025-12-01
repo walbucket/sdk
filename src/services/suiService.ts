@@ -15,17 +15,20 @@ export class SuiService {
   private grpcClient: SuiGrpcClient;
   private jsonRpcClient: SuiClient; // Fallback for queries that work better with JSON-RPC
   private signAndExecuteFn: SignAndExecuteTransaction | null; // Function for user-pays transactions
+  private userAddress: string | null; // User address for user-pays transactions
   private packageId: string;
   private network: SuiNetwork;
 
   constructor(
     network: SuiNetwork,
     packageId: string,
-    signAndExecuteFn?: SignAndExecuteTransaction
+    signAndExecuteFn?: SignAndExecuteTransaction,
+    userAddress?: string
   ) {
     this.network = network;
     this.packageId = packageId;
     this.signAndExecuteFn = signAndExecuteFn || null;
+    this.userAddress = userAddress || null;
 
     // Initialize gRPC client for transactions
     this.grpcClient = new SuiGrpcClient({
@@ -174,6 +177,11 @@ export class SuiService {
       }
 
       const tx = new Transaction();
+
+      // Set sender for user-pays mode
+      if (this.userAddress) {
+        tx.setSender(this.userAddress);
+      }
 
       // Convert strings to vectors (as required by contract)
       const blobIdBytes = Array.from(Buffer.from(params.blobId));

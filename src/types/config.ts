@@ -59,6 +59,13 @@ export interface WalbucketConfig {
   signAndExecuteTransaction?: SignAndExecuteTransaction;
 
   /**
+   * User's wallet address (required if gasStrategy is 'user-pays')
+   * This is the address that will pay for gas and sign transactions
+   * Use @mysten/dapp-kit's useCurrentAccount hook to get this
+   */
+  userAddress?: string;
+
+  /**
    * Package ID (auto-detected from network if not provided)
    * Developers don't need to provide this - it's automatically selected based on network
    */
