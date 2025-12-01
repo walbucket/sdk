@@ -689,6 +689,410 @@ export class Walbucket {
   }
 
   /**
+   * Rename an asset
+   *
+   * Renames an asset on the Sui blockchain. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param assetId - Asset ID to rename
+   * @param newName - New name for the asset
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If rename fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.rename('0x...', 'new-name.jpg');
+   * ```
+   */
+  async rename(assetId: string, newName: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.renameAsset({
+          assetId,
+          newName,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.renameAssetWithApiKey({
+          assetId,
+          newName,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+
+      // Clear cache to force refresh
+      this.assetCache.delete(assetId);
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Rename failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Copy an asset
+   *
+   * Creates a duplicate of an asset with a new name. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param assetId - Asset ID to copy
+   * @param newName - Name for the copied asset
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If copy fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.copy('0x...', 'copy-of-file.jpg');
+   * ```
+   */
+  async copy(assetId: string, newName: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.copyAsset({
+          assetId,
+          newName,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.copyAssetWithApiKey({
+          assetId,
+          newName,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Copy failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Delete an asset (user-pays version)
+   *
+   * Deletes an asset where the user pays gas fees. For developer-pays, use delete().
+   *
+   * @param assetId - Asset ID to delete
+   *
+   * @throws {ValidationError} If user-pays strategy not configured
+   * @throws {BlockchainError} If deletion fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.deleteUserPays('0x...');
+   * ```
+   */
+  async deleteUserPays(assetId: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy !== "user-pays") {
+        throw new ValidationError(
+          "deleteUserPays requires user-pays gas strategy (user must sign)"
+        );
+      }
+
+      // Get asset metadata
+      let asset = this.assetCache.get(assetId);
+      if (!asset) {
+        asset = await this.suiService.getAsset(assetId);
+        if (!asset) {
+          throw new ValidationError("Asset not found");
+        }
+      }
+
+      // Delete from Sui blockchain
+      await this.suiService.deleteAssetUserPays({ assetId });
+
+      // Delete from Walrus (optional - may not be supported for permanent blobs)
+      try {
+        await this.walrusService.delete(asset.blobId);
+      } catch (error) {
+        // Ignore Walrus deletion errors (may not be supported)
+      }
+
+      // Clear cache
+      this.assetCache.delete(assetId);
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Delete failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create a folder
+   *
+   * Creates a new folder for organizing assets. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param name - Folder name
+   * @param description - Folder description
+   * @param parentFolderId - Optional parent folder ID for nested folders
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If creation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.createFolder('My Photos', 'Personal photo collection');
+   * ```
+   */
+  async createFolder(
+    name: string,
+    description: string = "",
+    parentFolderId?: string
+  ): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.createFolder({
+          name,
+          description,
+          parentFolderId,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.createFolderWithApiKey({
+          name,
+          description,
+          parentFolderId,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Create folder failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Delete a folder
+   *
+   * Deletes an empty folder. Supports both user-pays and developer-sponsored gas strategies.
+   * Note: Folder must be empty before deletion.
+   *
+   * @param folderId - Folder ID to delete
+   *
+   * @throws {ValidationError} If configuration is invalid or folder not empty
+   * @throws {BlockchainError} If deletion fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.deleteFolder('0x...');
+   * ```
+   */
+  async deleteFolder(folderId: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.deleteFolder({ folderId });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.deleteFolderWithApiKey({
+          folderId,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Delete folder failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Move asset to folder
+   *
+   * Moves an asset into a folder or removes it from a folder. Supports both user-pays and developer-sponsored gas strategies.
+   *
+   * @param assetId - Asset ID to move
+   * @param folderId - Folder ID to move to (undefined to remove from folder)
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If move fails
+   *
+   * @example
+   * ```typescript
+   * // Move to folder
+   * await walbucket.moveToFolder('0x...asset', '0x...folder');
+   *
+   * // Remove from folder
+   * await walbucket.moveToFolder('0x...asset', undefined);
+   * ```
+   */
+  async moveToFolder(assetId: string, folderId?: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.moveAssetToFolder({
+          assetId,
+          folderId,
+        });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.moveAssetToFolderWithApiKey({
+          assetId,
+          folderId,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+
+      // Clear cache to force refresh
+      this.assetCache.delete(assetId);
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Move to folder failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * List assets owned by an address
    *
    * Fetches all assets owned by the given address from the Sui blockchain.

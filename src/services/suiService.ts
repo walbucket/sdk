@@ -366,7 +366,7 @@ export class SuiService {
   }
 
   /**
-   * Delete asset from Sui blockchain
+   * Delete asset from Sui blockchain (developer-pays with API key)
    * Matches contract function: delete_asset_with_api_key
    */
   async deleteAsset(params: {
@@ -410,6 +410,37 @@ export class SuiService {
         transaction: tx,
         signer: params.signer,
       });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to delete asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Delete asset (wallet-based user-pays transaction)
+   * Matches contract function: delete_asset
+   */
+  async deleteAssetUserPays(params: { assetId: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::delete_asset`,
+        arguments: [tx.object(params.assetId), tx.object("0x6")], // Clock
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
     } catch (error) {
       throw new BlockchainError(
         `Failed to delete asset: ${
@@ -703,6 +734,451 @@ export class SuiService {
     } catch (error) {
       throw new BlockchainError(
         `Failed to create transformation request: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Rename asset (wallet-based user-pays transaction)
+   * Matches contract function: rename_asset
+   */
+  async renameAsset(params: {
+    assetId: string;
+    newName: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const newNameBytes = Array.from(Buffer.from(params.newName, "utf-8"));
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::rename_asset`,
+        arguments: [
+          tx.object(params.assetId),
+          tx.pure.vector("u8", newNameBytes),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to rename asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Copy asset (wallet-based user-pays transaction)
+   * Matches contract function: copy_asset
+   */
+  async copyAsset(params: { assetId: string; newName: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const newNameBytes = Array.from(Buffer.from(params.newName, "utf-8"));
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::copy_asset`,
+        arguments: [
+          tx.object(params.assetId),
+          tx.pure.vector("u8", newNameBytes),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to copy asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create folder (wallet-based user-pays transaction)
+   * Matches contract function: create_folder
+   */
+  async createFolder(params: {
+    name: string;
+    description: string;
+    parentFolderId?: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const nameBytes = Array.from(Buffer.from(params.name, "utf-8"));
+      const descriptionBytes = Array.from(
+        Buffer.from(params.description, "utf-8")
+      );
+
+      const parentFolderIdArg = params.parentFolderId
+        ? tx.pure.option("address", params.parentFolderId)
+        : tx.pure.option("address", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::folder::create_folder`,
+        arguments: [
+          tx.pure.vector("u8", nameBytes),
+          tx.pure.vector("u8", descriptionBytes),
+          parentFolderIdArg,
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to create folder: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Delete folder (wallet-based user-pays transaction)
+   * Matches contract function: delete_folder
+   * Note: Folder must be empty
+   */
+  async deleteFolder(params: { folderId: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::folder::delete_folder`,
+        arguments: [tx.object(params.folderId), tx.object("0x6")], // Clock
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to delete folder: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Move asset to folder (wallet-based user-pays transaction)
+   * Matches contract function: move_asset_to_folder
+   */
+  async moveAssetToFolder(params: {
+    assetId: string;
+    folderId?: string; // undefined means remove from folder
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const folderIdArg = params.folderId
+        ? tx.pure.option("address", params.folderId)
+        : tx.pure.option("address", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::move_asset_to_folder`,
+        arguments: [
+          tx.object(params.assetId),
+          folderIdArg,
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to move asset to folder: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Rename asset with API key (Developer-sponsored)
+   * Matches contract function: rename_asset_with_api_key
+   */
+  async renameAssetWithApiKey(params: {
+    assetId: string;
+    newName: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const newNameBytes = Array.from(Buffer.from(params.newName, "utf-8"));
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::rename_asset_with_api_key`,
+        arguments: [
+          tx.object(params.assetId),
+          tx.pure.vector("u8", newNameBytes),
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to rename asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Copy asset with API key (Developer-sponsored)
+   * Matches contract function: copy_asset_with_api_key
+   */
+  async copyAssetWithApiKey(params: {
+    assetId: string;
+    newName: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const newNameBytes = Array.from(Buffer.from(params.newName, "utf-8"));
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::copy_asset_with_api_key`,
+        arguments: [
+          tx.object(params.assetId),
+          tx.pure.vector("u8", newNameBytes),
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to copy asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Create folder with API key (Developer-sponsored)
+   * Matches contract function: create_folder_with_api_key
+   */
+  async createFolderWithApiKey(params: {
+    name: string;
+    description: string;
+    parentFolderId?: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const nameBytes = Array.from(Buffer.from(params.name, "utf-8"));
+      const descriptionBytes = Array.from(
+        Buffer.from(params.description, "utf-8")
+      );
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      const parentFolderIdArg = params.parentFolderId
+        ? tx.pure.option("address", params.parentFolderId)
+        : tx.pure.option("address", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::folder::create_folder_with_api_key`,
+        arguments: [
+          tx.pure.vector("u8", nameBytes),
+          tx.pure.vector("u8", descriptionBytes),
+          parentFolderIdArg,
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to create folder: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Delete folder with API key (Developer-sponsored)
+   * Matches contract function: delete_folder_with_api_key
+   * Note: Folder must be empty
+   */
+  async deleteFolderWithApiKey(params: {
+    folderId: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::folder::delete_folder_with_api_key`,
+        arguments: [
+          tx.object(params.folderId),
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to delete folder: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Move asset to folder with API key (Developer-sponsored)
+   * Matches contract function: move_asset_to_folder_with_api_key
+   */
+  async moveAssetToFolderWithApiKey(params: {
+    assetId: string;
+    folderId?: string; // undefined means remove from folder
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      const folderIdArg = params.folderId
+        ? tx.pure.option("address", params.folderId)
+        : tx.pure.option("address", null);
+
+      tx.moveCall({
+        target: `${this.packageId}::asset::move_asset_to_folder_with_api_key`,
+        arguments: [
+          tx.object(params.assetId),
+          folderIdArg,
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to move asset to folder: ${
           error instanceof Error ? error.message : String(error)
         }`,
         undefined,

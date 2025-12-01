@@ -1,5 +1,94 @@
 # Release Notes
 
+## v0.4.0 - Dual Gas Strategy Support for File Operations (2025-12-01)
+
+### 🎉 Major Update - New Features
+
+**NEW**: All file operation methods now support both user-pays and developer-sponsored gas strategies automatically.
+
+### ✨ New Features
+
+- **File Operations - User-Pays Support**: Added user-pays versions for all file management operations
+  - `rename()` - Rename assets with user or developer gas
+  - `copy()` - Copy assets with user or developer gas
+  - `createFolder()` - Create folders with user or developer gas
+  - `deleteFolder()` - Delete folders with user or developer gas
+  - `moveToFolder()` - Move assets to folders with user or developer gas
+  - SDK automatically chooses the correct implementation based on `gasStrategy` configuration
+
+- **Smart Contract Integration**: Added API-key sponsored versions in SuiService
+  - `renameAssetWithApiKey()` - Developer-sponsored rename
+  - `copyAssetWithApiKey()` - Developer-sponsored copy
+  - `createFolderWithApiKey()` - Developer-sponsored folder creation
+  - `deleteFolderWithApiKey()` - Developer-sponsored folder deletion
+  - `moveAssetToFolderWithApiKey()` - Developer-sponsored move to folder
+
+### 🔄 Breaking Changes
+
+**None** - This is a feature addition that maintains backward compatibility. Existing code continues to work without changes.
+
+### 🔧 Technical Changes
+
+- Updated Walbucket class methods to check `gasStrategy` and call appropriate SuiService method
+- User-pays methods call contract functions ending with asset/folder function names
+- Developer-sponsored methods call contract functions ending with `_with_api_key`
+- All methods maintain the same public API regardless of gas strategy
+
+### 📝 Usage Examples
+
+**User-Pays (End User Signs & Pays):**
+
+```typescript
+const walbucket = new Walbucket({
+  gasStrategy: "user-pays",
+  signAndExecuteTransaction: signAndExecuteTransaction,
+  network: "testnet",
+});
+
+// User signs and pays gas for these operations
+await walbucket.rename(assetId, "new-name.jpg");
+await walbucket.copy(assetId, "copy-of-file.jpg");
+await walbucket.createFolder("My Photos", "Personal photos");
+await walbucket.moveToFolder(assetId, folderId);
+await walbucket.deleteFolder(folderId);
+```
+
+**Developer-Sponsored (Developer Pays):**
+
+```typescript
+const walbucket = new Walbucket({
+  gasStrategy: "developer-sponsored",
+  apiKey: "your-api-key-hash",
+  network: "testnet",
+});
+
+// Developer pays gas for these operations
+await walbucket.rename(assetId, "new-name.jpg");
+await walbucket.copy(assetId, "copy-of-file.jpg");
+await walbucket.createFolder("My Photos", "Personal photos");
+await walbucket.moveToFolder(assetId, folderId);
+await walbucket.deleteFolder(folderId);
+```
+
+### 🎯 What This Enables
+
+1. **Flexible Architecture**: Same code works with both gas strategies
+2. **B2C Platforms**: Let users manage their files with user-pays, or provide free tier with developer-pays
+3. **Hybrid Models**: Mix strategies - user-pays for file operations, developer-pays for uploads
+4. **Simplified Integration**: No need to write separate code for different gas strategies
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@latest
+```
+
+All existing code continues to work. New methods automatically adapt to your configured gas strategy.
+
+---
+
 ## v0.3.1 - Shared Object API Key Lookup Fix (2025-01-30)
 
 ### 🐛 Bug Fixes
