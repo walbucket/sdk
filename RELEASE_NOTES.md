@@ -1,5 +1,55 @@
 # Release Notes
 
+## v0.2.2 - Transaction Execution Fixes (2024-12-01)
+
+### 🐛 Critical Bug Fixes
+
+- **Ownership Error**: Fixed "Transaction was not signed by the correct sender" error
+  - Removed `tx.setSender()` call to allow Sui to infer sender from transaction signature
+  - Any user can now upload files using developer's API key (as intended)
+  - API key and developer account objects can be referenced by any transaction
+  
+- **Asset ID Extraction**: Fixed "Failed to get asset ID from transaction" error
+  - Added `options` parameter to `SignAndExecuteTransaction` type for requesting transaction effects
+  - SDK now passes `showEffects`, `showObjectChanges`, and `showEvents` options to wallet
+  - Added `waitForTransaction` fallback to handle async transaction indexing
+  - Supports both `effects.created` and `objectChanges` response formats
+
+### 🔧 Technical Changes
+
+- Updated `SignAndExecuteTransaction` type to accept options parameter
+- Removed `userAddress` requirement from SDK configuration (no longer needed)
+- Added automatic transaction result waiting and querying
+- Improved asset ID extraction with multiple fallback strategies
+
+### 📝 Migration Guide
+
+**No breaking changes** - This is a bug fix release. If you were using v0.2.1, simply update:
+
+```bash
+pnpm add @walbucket/sdk@latest
+```
+
+**Optional**: You can now remove `userAddress` from your SDK configuration (it's ignored):
+
+```typescript
+const walbucket = await createWalbucket({
+  apiKey: "your-api-key",
+  network: "testnet",
+  gasStrategy: "user-pays",
+  signAndExecuteTransaction: signAndExecuteTransaction,
+  // userAddress: currentAccount.address, ← Can be removed
+});
+```
+
+### 🎯 What This Fixes
+
+1. **Multi-user support**: Different users can now upload files using the same developer API key
+2. **Transaction completion**: Uploads now properly complete and return asset IDs
+3. **Wallet compatibility**: Better handling of different wallet response formats
+
+---
+
 ## v0.2.1 - Transaction Sender Fix (2024-12-01)
 
 ### 🐛 Bug Fixes
