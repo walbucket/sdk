@@ -178,10 +178,10 @@ export class SuiService {
 
       const tx = new Transaction();
 
-      // Set sender for user-pays mode
-      if (this.userAddress) {
-        tx.setSender(this.userAddress);
-      }
+      // Don't set sender explicitly - let Sui infer it from object ownership
+      // This allows both developer and user accounts to work correctly
+      // When user pays gas, they sign the transaction which sets them as sender
+      // When developer sponsors gas, the signer's address is used
 
       // Convert strings to vectors (as required by contract)
       const blobIdBytes = Array.from(Buffer.from(params.blobId));
@@ -233,7 +233,28 @@ export class SuiService {
         // User-pays mode: use provided signAndExecuteTransaction function
         result = await this.signAndExecuteFn({
           transaction: tx,
+          options: {
+            showEffects: true,
+            showObjectChanges: true,
+            showEvents: true,
+          },
         });
+
+        // If effects are not immediately available, wait and query the transaction
+        if (!result.effects && result.digest) {
+          // Wait a bit for indexing
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Query transaction result
+          const txResult = await this.jsonRpcClient.waitForTransaction({
+            digest: result.digest,
+            options: {
+              showEffects: true,
+              showObjectChanges: true,
+            },
+          });
+          result = txResult;
+        }
       } else {
         // Developer-sponsored mode: use keypair signer with internal client
         result = await this.jsonRpcClient.signAndExecuteTransaction({
@@ -246,11 +267,24 @@ export class SuiService {
         });
       }
 
-      // Extract asset ID from created objects
+      // Extract asset ID from created objects in effects
       if (result.effects?.created) {
         const created = result.effects.created;
         if (created && created.length > 0) {
           const assetId = created[0].reference?.objectId;
+          if (assetId) {
+            return assetId;
+          }
+        }
+      }
+
+      // Fallback: try objectChanges if effects.created is not available
+      if (result.objectChanges) {
+        const createdObjects = result.objectChanges.filter(
+          (change: any) => change.type === 'created'
+        );
+        if (createdObjects.length > 0) {
+          const assetId = createdObjects[0].objectId;
           if (assetId) {
             return assetId;
           }

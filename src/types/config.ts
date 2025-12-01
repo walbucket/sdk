@@ -12,6 +12,11 @@ export type SuiNetwork = "testnet" | "mainnet" | "devnet" | "localnet";
  */
 export type SignAndExecuteTransaction = (input: {
   transaction: Transaction;
+  options?: {
+    showEffects?: boolean;
+    showObjectChanges?: boolean;
+    showEvents?: boolean;
+  };
 }) => Promise<any>;
 
 /**
