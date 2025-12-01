@@ -113,12 +113,15 @@ export class Walbucket {
     this.config = validateConfig(config) as Required<WalbucketConfig>;
 
     // Initialize Sui service
-    // Pass external client only for user-pays strategy (wallet transactions)
-    const externalClient = this.config.gasStrategy === 'user-pays' ? this.config.suiClient : undefined;
+    // Pass signAndExecuteTransaction function for user-pays strategy
+    const signAndExecuteFn =
+      this.config.gasStrategy === "user-pays"
+        ? this.config.signAndExecuteTransaction
+        : undefined;
     this.suiService = new SuiService(
       this.config.network,
       this.config.packageId,
-      externalClient
+      signAndExecuteFn
     );
 
     // Initialize Walrus service
@@ -151,8 +154,7 @@ export class Walbucket {
     // Initialize signer based on gas strategy
     this.signer = GasStrategyService.getSigner(
       this.config.gasStrategy,
-      this.config.sponsorPrivateKey,
-      this.config.userSigner
+      this.config.sponsorPrivateKey
     );
   }
 

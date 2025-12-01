@@ -2,7 +2,7 @@ import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import type { Signer } from "@mysten/sui/cryptography";
-import type { SuiNetwork } from "../types/config.js";
+import type { SuiNetwork, SignAndExecuteTransaction } from "../types/config.js";
 import type { AssetMetadata } from "../types/responses.js";
 import { BlockchainError } from "../types/errors.js";
 import { getSuiGrpcUrl } from "../utils/config.js";
@@ -14,14 +14,18 @@ import { getSuiGrpcUrl } from "../utils/config.js";
 export class SuiService {
   private grpcClient: SuiGrpcClient;
   private jsonRpcClient: SuiClient; // Fallback for queries that work better with JSON-RPC
-  private externalClient: SuiClient | null; // External client for wallet transactions
+  private signAndExecuteFn: SignAndExecuteTransaction | null; // Function for user-pays transactions
   private packageId: string;
   private network: SuiNetwork;
 
-  constructor(network: SuiNetwork, packageId: string, externalClient?: SuiClient) {
+  constructor(
+    network: SuiNetwork,
+    packageId: string,
+    signAndExecuteFn?: SignAndExecuteTransaction
+  ) {
     this.network = network;
     this.packageId = packageId;
-    this.externalClient = externalClient || null;
+    this.signAndExecuteFn = signAndExecuteFn || null;
 
     // Initialize gRPC client for transactions
     this.grpcClient = new SuiGrpcClient({
@@ -215,22 +219,15 @@ export class SuiService {
       });
 
       // Build and sign transaction
-      // Check if signer is a wallet account (has signAndExecuteTransaction method)
-      // or a keypair (has toSuiAddress method)
       let result: any;
 
-      if (
-        "signAndExecuteTransaction" in params.signer &&
-        typeof params.signer.signAndExecuteTransaction === "function"
-      ) {
-        // Wallet signer - use external client if provided, otherwise internal
-        const clientToUse = this.externalClient || this.jsonRpcClient;
-        result = await params.signer.signAndExecuteTransaction({
+      if (this.signAndExecuteFn) {
+        // User-pays mode: use provided signAndExecuteTransaction function
+        result = await this.signAndExecuteFn({
           transaction: tx,
-          client: clientToUse,
         });
       } else {
-        // Keypair signer - use internal SuiClient's signAndExecuteTransaction
+        // Developer-sponsored mode: use keypair signer with internal client
         result = await this.jsonRpcClient.signAndExecuteTransaction({
           transaction: tx,
           signer: params.signer,
