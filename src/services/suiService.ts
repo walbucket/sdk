@@ -1,11 +1,11 @@
-import { SuiGrpcClient } from '@mysten/sui/grpc';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { Transaction } from '@mysten/sui/transactions';
-import type { Signer } from '@mysten/sui/cryptography';
-import type { SuiNetwork } from '../types/config.js';
-import type { AssetMetadata } from '../types/responses.js';
-import { BlockchainError } from '../types/errors.js';
-import { getSuiGrpcUrl } from '../utils/config.js';
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
+import type { Signer } from "@mysten/sui/cryptography";
+import type { SuiNetwork } from "../types/config.js";
+import type { AssetMetadata } from "../types/responses.js";
+import { BlockchainError } from "../types/errors.js";
+import { getSuiGrpcUrl } from "../utils/config.js";
 
 /**
  * Sui Service
@@ -20,13 +20,13 @@ export class SuiService {
   constructor(network: SuiNetwork, packageId: string) {
     this.network = network;
     this.packageId = packageId;
-    
+
     // Initialize gRPC client for transactions
     this.grpcClient = new SuiGrpcClient({
       network,
       baseUrl: getSuiGrpcUrl(network),
     });
-    
+
     // Initialize JSON-RPC client for queries (more stable API)
     // TODO: Migrate to full gRPC once API is stable
     this.jsonRpcClient = new SuiClient({
@@ -36,10 +36,10 @@ export class SuiService {
 
   /**
    * Get asset metadata from Sui blockchain
-   * 
+   *
    * Queries the Sui blockchain for asset metadata including blob ID, name, size,
    * content type, tags, and other metadata.
-   * 
+   *
    * @param assetId - The asset object ID on Sui
    * @returns Asset metadata or null if not found
    * @throws {BlockchainError} If the query fails
@@ -55,7 +55,7 @@ export class SuiService {
         },
       });
 
-      if (!object.data || !('content' in object.data)) {
+      if (!object.data || !("content" in object.data)) {
         return null;
       }
 
@@ -63,31 +63,33 @@ export class SuiService {
       const fields = content.fields || {};
 
       const blobId = this.bytesToString(fields.blob_id || []);
-      
+
       return {
         assetId,
-        owner: fields.owner || '',
+        owner: fields.owner || "",
         blobId,
-        url: '', // Will be set by Walbucket class using generateFileUrl
-        name: fields.name || '',
-        contentType: fields.content_type || 'application/octet-stream',
+        url: "", // Will be set by Walbucket class using generateFileUrl
+        name: fields.name || "",
+        contentType: fields.content_type || "application/octet-stream",
         size: Number(fields.size || 0),
         createdAt: Number(fields.created_at || 0) * 1000, // Convert to milliseconds
         updatedAt: Number(fields.updated_at || fields.created_at || 0) * 1000,
         policyId: fields.policy_id?.fields?.id || undefined,
-        tags: (fields.tags || []).map((tag: any) => tag || ''),
-        description: fields.description || '',
-        category: fields.category || '',
+        tags: (fields.tags || []).map((tag: any) => tag || ""),
+        description: fields.description || "",
+        category: fields.category || "",
         width: fields.width ? Number(fields.width) : undefined,
         height: fields.height ? Number(fields.height) : undefined,
-        thumbnailBlobId: fields.thumbnail_blob_id 
-          ? this.bytesToString(fields.thumbnail_blob_id) 
+        thumbnailBlobId: fields.thumbnail_blob_id
+          ? this.bytesToString(fields.thumbnail_blob_id)
           : undefined,
         folderId: fields.folder_id?.fields?.id || undefined,
       };
     } catch (error) {
       throw new BlockchainError(
-        `Failed to get asset: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to get asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -96,11 +98,11 @@ export class SuiService {
 
   /**
    * Create asset on Sui blockchain
-   * 
+   *
    * Creates a new asset record on the Sui blockchain using the contract's
    * `upload_asset_with_api_key` function. This records the asset metadata
    * and links it to the blob stored in Walrus.
-   * 
+   *
    * @param params - Asset creation parameters
    * @param params.blobId - Blob ID from Walrus storage
    * @param params.name - Asset name/filename
@@ -117,11 +119,11 @@ export class SuiService {
    * @param params.apiKeyHash - Hashed API key
    * @param params.developerAccountId - Developer account object ID
    * @param params.signer - Transaction signer
-   * 
+   *
    * @returns The created asset object ID
-   * 
+   *
    * @throws {BlockchainError} If transaction fails or required objects not found
-   * 
+   *
    * @example
    * ```typescript
    * const assetId = await suiService.createAsset({
@@ -162,7 +164,7 @@ export class SuiService {
       ]);
 
       if (!apiKeyObj.data || !devAccountObj.data) {
-        throw new BlockchainError('Required objects not found');
+        throw new BlockchainError("Required objects not found");
       }
 
       const tx = new Transaction();
@@ -171,8 +173,10 @@ export class SuiService {
       const blobIdBytes = Array.from(Buffer.from(params.blobId));
       const nameBytes = Array.from(Buffer.from(params.name));
       const contentTypeBytes = Array.from(Buffer.from(params.contentType));
-      const apiKeyHashBytes = Array.from(Buffer.from(params.apiKeyHash.replace('0x', ''), 'hex'));
-      const tagsBytes = params.tags.map(tag => Array.from(Buffer.from(tag)));
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+      const tagsBytes = params.tags.map((tag) => Array.from(Buffer.from(tag)));
       const descBytes = Array.from(Buffer.from(params.description));
       const catBytes = Array.from(Buffer.from(params.category));
 
@@ -180,28 +184,31 @@ export class SuiService {
       tx.moveCall({
         target: `${this.packageId}::asset::upload_asset_with_api_key`,
         arguments: [
-          tx.pure.vector('u8', blobIdBytes),
-          tx.pure.vector('u8', nameBytes),
-          tx.pure.vector('u8', contentTypeBytes),
+          tx.pure.vector("u8", blobIdBytes),
+          tx.pure.vector("u8", nameBytes),
+          tx.pure.vector("u8", contentTypeBytes),
           tx.pure.u64(BigInt(params.size)),
-          tx.pure.vector('vector<u8>', tagsBytes),
-          tx.pure.vector('u8', descBytes),
-          tx.pure.vector('u8', catBytes),
-          tx.pure.option('u64', params.width ? BigInt(params.width) : null),
-          tx.pure.option('u64', params.height ? BigInt(params.height) : null),
-          tx.pure.option('vector<u8>', params.thumbnailBlobId 
-            ? Array.from(Buffer.from(params.thumbnailBlobId)) 
-            : null),
+          tx.pure.vector("vector<u8>", tagsBytes),
+          tx.pure.vector("u8", descBytes),
+          tx.pure.vector("u8", catBytes),
+          tx.pure.option("u64", params.width ? BigInt(params.width) : null),
+          tx.pure.option("u64", params.height ? BigInt(params.height) : null),
+          tx.pure.option(
+            "vector<u8>",
+            params.thumbnailBlobId
+              ? Array.from(Buffer.from(params.thumbnailBlobId))
+              : null
+          ),
           // folder_id: Option<ID> - pass as object reference if provided, or null
           // Note: In Sui, Option<ID> in Move maps to optional object reference
           // We need to handle this as an optional object argument
           // For now, using address as placeholder (backend uses same approach)
           // TODO: Fix to use proper ID type when Sui SDK supports it
-          tx.pure.option('address', params.folderId || null),
+          tx.pure.option("address", params.folderId || null),
           tx.object(params.apiKeyId),
-          tx.pure.vector('u8', apiKeyHashBytes),
+          tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
-          tx.object('0x6'), // Clock shared object
+          tx.object("0x6"), // Clock shared object
         ],
       });
 
@@ -226,10 +233,12 @@ export class SuiService {
         }
       }
 
-      throw new BlockchainError('Failed to get asset ID from transaction');
+      throw new BlockchainError("Failed to get asset ID from transaction");
     } catch (error) {
       throw new BlockchainError(
-        `Failed to create asset: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -256,21 +265,23 @@ export class SuiService {
       ]);
 
       if (!assetObj.data || !apiKeyObj.data || !devAccountObj.data) {
-        throw new BlockchainError('Required objects not found');
+        throw new BlockchainError("Required objects not found");
       }
 
       const tx = new Transaction();
-      
-      const apiKeyHashBytes = Array.from(Buffer.from(params.apiKeyHash.replace('0x', ''), 'hex'));
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
 
       tx.moveCall({
         target: `${this.packageId}::asset::delete_asset_with_api_key`,
         arguments: [
           tx.object(params.assetId),
           tx.object(params.apiKeyId),
-          tx.pure.vector('u8', apiKeyHashBytes),
+          tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
-          tx.object('0x6'), // Clock
+          tx.object("0x6"), // Clock
         ],
       });
 
@@ -281,7 +292,9 @@ export class SuiService {
       });
     } catch (error) {
       throw new BlockchainError(
-        `Failed to delete asset: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to delete asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -313,7 +326,7 @@ export class SuiService {
       ]);
 
       if (!assetObj.data || !apiKeyObj.data || !devAccountObj.data) {
-        throw new BlockchainError('Required objects not found');
+        throw new BlockchainError("Required objects not found");
       }
 
       const tx = new Transaction();
@@ -322,16 +335,19 @@ export class SuiService {
       const policyType = params.policyType;
 
       // Convert addresses (remove 0x prefix if present)
-      const addresses = params.allowedAddresses.map(addr => addr.replace('0x', ''));
+      const addresses = params.allowedAddresses.map((addr) =>
+        addr.replace("0x", "")
+      );
 
       // Convert expiration (from milliseconds to seconds)
-      const expiration = params.expiration > 0 
-        ? BigInt(Math.floor(params.expiration / 1000)) 
-        : BigInt(0);
+      const expiration =
+        params.expiration > 0
+          ? BigInt(Math.floor(params.expiration / 1000))
+          : BigInt(0);
 
       // Convert password hash to bytes
-      const passwordHashBytes = params.passwordHash 
-        ? Array.from(Buffer.from(params.passwordHash.replace('0x', ''), 'hex'))
+      const passwordHashBytes = params.passwordHash
+        ? Array.from(Buffer.from(params.passwordHash.replace("0x", ""), "hex"))
         : [];
 
       // Call contract function: create_encryption_policy_with_api_key
@@ -340,13 +356,16 @@ export class SuiService {
         arguments: [
           tx.object(params.assetId),
           tx.pure.u8(policyType),
-          tx.pure.vector('address', addresses),
+          tx.pure.vector("address", addresses),
           tx.pure.u64(expiration),
-          tx.pure.vector('u8', passwordHashBytes),
+          tx.pure.vector("u8", passwordHashBytes),
           tx.object(params.apiKeyId),
-          tx.pure.vector('u8', Array.from(Buffer.from(params.apiKeyHash.replace('0x', ''), 'hex'))),
+          tx.pure.vector(
+            "u8",
+            Array.from(Buffer.from(params.apiKeyHash.replace("0x", ""), "hex"))
+          ),
           tx.object(params.developerAccountId),
-          tx.object('0x6'), // Clock
+          tx.object("0x6"), // Clock
         ],
       });
 
@@ -371,10 +390,12 @@ export class SuiService {
         }
       }
 
-      throw new BlockchainError('Failed to get policy ID from transaction');
+      throw new BlockchainError("Failed to get policy ID from transaction");
     } catch (error) {
       throw new BlockchainError(
-        `Failed to create policy: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create policy: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -395,20 +416,29 @@ export class SuiService {
   }): Promise<void> {
     try {
       // Get required objects
-      const [assetObj, policyObj, apiKeyObj, devAccountObj] = await Promise.all([
-        this.jsonRpcClient.getObject({ id: params.assetId }),
-        this.jsonRpcClient.getObject({ id: params.policyId }),
-        this.jsonRpcClient.getObject({ id: params.apiKeyId }),
-        this.jsonRpcClient.getObject({ id: params.developerAccountId }),
-      ]);
+      const [assetObj, policyObj, apiKeyObj, devAccountObj] = await Promise.all(
+        [
+          this.jsonRpcClient.getObject({ id: params.assetId }),
+          this.jsonRpcClient.getObject({ id: params.policyId }),
+          this.jsonRpcClient.getObject({ id: params.apiKeyId }),
+          this.jsonRpcClient.getObject({ id: params.developerAccountId }),
+        ]
+      );
 
-      if (!assetObj.data || !policyObj.data || !apiKeyObj.data || !devAccountObj.data) {
-        throw new BlockchainError('Required objects not found');
+      if (
+        !assetObj.data ||
+        !policyObj.data ||
+        !apiKeyObj.data ||
+        !devAccountObj.data
+      ) {
+        throw new BlockchainError("Required objects not found");
       }
 
       const tx = new Transaction();
 
-      const apiKeyHashBytes = Array.from(Buffer.from(params.apiKeyHash.replace('0x', ''), 'hex'));
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
 
       // Call contract function: apply_policy_to_asset_with_api_key
       tx.moveCall({
@@ -417,9 +447,9 @@ export class SuiService {
           tx.object(params.assetId),
           tx.object(params.policyId),
           tx.object(params.apiKeyId),
-          tx.pure.vector('u8', apiKeyHashBytes),
+          tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
-          tx.object('0x6'), // Clock
+          tx.object("0x6"), // Clock
         ],
       });
 
@@ -430,7 +460,9 @@ export class SuiService {
       });
     } catch (error) {
       throw new BlockchainError(
-        `Failed to apply policy: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to apply policy: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -456,7 +488,7 @@ export class SuiService {
         },
       });
 
-      if (!object.data || !('content' in object.data)) {
+      if (!object.data || !("content" in object.data)) {
         return null;
       }
 
@@ -465,9 +497,11 @@ export class SuiService {
 
       return {
         policyId,
-        assetId: fields.asset_id?.fields?.id || '',
+        assetId: fields.asset_id?.fields?.id || "",
         policyType: Number(fields.policy_type || 0),
-        allowedAddresses: (fields.allowed_addresses || []).map((addr: any) => addr || ''),
+        allowedAddresses: (fields.allowed_addresses || []).map(
+          (addr: any) => addr || ""
+        ),
         expiration: Number(fields.expiration || 0) * 1000, // Convert to milliseconds
         createdAt: Number(fields.created_at || 0) * 1000,
       };
@@ -499,12 +533,14 @@ export class SuiService {
       ]);
 
       if (!assetObj.data || !apiKeyObj.data || !devAccountObj.data) {
-        throw new BlockchainError('Required objects not found');
+        throw new BlockchainError("Required objects not found");
       }
 
       const tx = new Transaction();
 
-      const apiKeyHashBytes = Array.from(Buffer.from(params.apiKeyHash.replace('0x', ''), 'hex'));
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
 
       // Call contract function: request_transformation_with_api_key
       tx.moveCall({
@@ -512,11 +548,11 @@ export class SuiService {
         arguments: [
           tx.object(params.assetId),
           tx.pure.u8(params.transformType),
-          tx.pure.vector('u8', params.parameters),
+          tx.pure.vector("u8", params.parameters),
           tx.object(params.apiKeyId),
-          tx.pure.vector('u8', apiKeyHashBytes),
+          tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
-          tx.object('0x6'), // Clock
+          tx.object("0x6"), // Clock
         ],
       });
 
@@ -541,25 +577,99 @@ export class SuiService {
         }
       }
 
-      throw new BlockchainError('Failed to get transformation request ID from transaction');
+      throw new BlockchainError(
+        "Failed to get transformation request ID from transaction"
+      );
     } catch (error) {
       throw new BlockchainError(
-        `Failed to create transformation request: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create transformation request: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
     }
   }
 
+  /**
+   * List assets owned by an address
+   *
+   * Queries the Sui blockchain for all Asset objects owned by the given address.
+   *
+   * @param owner - The owner address to query assets for
+   * @returns Array of asset metadata
+   * @throws {BlockchainError} If the query fails
+   */
+  async listAssets(owner: string): Promise<AssetMetadata[]> {
+    try {
+      // Query for all objects owned by the address with Asset type filter
+      const response = await this.jsonRpcClient.getOwnedObjects({
+        owner,
+        filter: {
+          StructType: `${this.packageId}::asset::Asset`,
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      const assets: AssetMetadata[] = [];
+
+      for (const item of response.data) {
+        if (!item.data || !("content" in item.data)) {
+          continue;
+        }
+
+        const content = item.data.content as any;
+        const fields = content.fields || {};
+        const assetId = item.data.objectId;
+
+        const blobId = this.bytesToString(fields.blob_id || []);
+
+        assets.push({
+          assetId,
+          owner: fields.owner || owner,
+          blobId,
+          url: "", // Will be set by Walbucket class using generateFileUrl
+          name: fields.name || "",
+          contentType: fields.content_type || "application/octet-stream",
+          size: Number(fields.size || 0),
+          createdAt: Number(fields.created_at || 0) * 1000, // Convert to milliseconds
+          updatedAt: Number(fields.updated_at || fields.created_at || 0) * 1000,
+          policyId: fields.policy_id?.fields?.id || undefined,
+          tags: (fields.tags || []).map((tag: any) => tag || ""),
+          description: fields.description || "",
+          category: fields.category || "",
+          width: fields.width ? Number(fields.width) : undefined,
+          height: fields.height ? Number(fields.height) : undefined,
+          thumbnailBlobId: fields.thumbnail_blob_id
+            ? this.bytesToString(fields.thumbnail_blob_id)
+            : undefined,
+          folderId: fields.folder_id?.fields?.id || undefined,
+        });
+      }
+
+      return assets;
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to list assets: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
 
   /**
    * Convert bytes array to string
    */
   private bytesToString(bytes: number[] | Uint8Array): string {
     if (Array.isArray(bytes)) {
-      return Buffer.from(bytes).toString('utf-8');
+      return Buffer.from(bytes).toString("utf-8");
     }
-    return Buffer.from(bytes).toString('utf-8');
+    return Buffer.from(bytes).toString("utf-8");
   }
 
   /**
@@ -568,7 +678,7 @@ export class SuiService {
   getClient(): SuiGrpcClient {
     return this.grpcClient;
   }
-  
+
   /**
    * Get JSON-RPC client (for queries)
    */

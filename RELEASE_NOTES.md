@@ -1,5 +1,39 @@
 # Release Notes
 
+## v0.1.1 - Asset Listing Feature (2024-12-01)
+
+### ✨ New Features
+
+- **Asset Listing**: Added `list(owner?: string)` method to query and retrieve all assets owned by a user
+  - Queries the Sui blockchain for Asset objects owned by the specified address
+  - Defaults to using the signer's address if no owner is provided
+  - Returns array of `AssetMetadata` with full file information
+  - Results are automatically cached to reduce blockchain queries
+  - Supports filtering by folder ID in the dapp hooks layer
+
+### 🔧 Improvements
+
+- **SuiService**: Added `listAssets(owner: string)` method for querying owned objects
+- **Type Safety**: Improved address extraction from different signer types (Ed25519Keypair, wallet signers)
+- **Caching**: List results are cached with automatic URL generation
+
+### 📝 API Changes
+
+**New Method:**
+```typescript
+// List assets for the signer
+const assets = await walbucket.list();
+
+// List assets for a specific address
+const assets = await walbucket.list('0x...');
+```
+
+### 🐛 Bug Fixes
+
+None in this release.
+
+---
+
 ## v0.1.0 - Initial Release (2024-11-29)
 
 ### 🎉 First Public Release

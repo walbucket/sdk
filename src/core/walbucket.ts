@@ -1,43 +1,49 @@
-import { SuiService } from '../services/suiService.js';
-import { WalrusService } from '../services/walrusService.js';
-import { ApiKeyService, PERMISSION_UPLOAD, PERMISSION_READ, PERMISSION_DELETE, PERMISSION_TRANSFORM } from '../services/apiKeyService.js';
-import { SealService } from '../services/sealService.js';
-import { GasStrategyService } from '../strategies/gasStrategy.js';
-import { validateConfig } from '../utils/config.js';
-import { fileToBuffer, getFileName, getContentType } from '../utils/file.js';
-import { Cache } from '../utils/cache.js';
-import type { 
-  WalbucketConfig, 
-  UploadOptions, 
-  RetrieveOptions, 
+import { SuiService } from "../services/suiService.js";
+import { WalrusService } from "../services/walrusService.js";
+import {
+  ApiKeyService,
+  PERMISSION_UPLOAD,
+  PERMISSION_READ,
+  PERMISSION_DELETE,
+  PERMISSION_TRANSFORM,
+} from "../services/apiKeyService.js";
+import { SealService } from "../services/sealService.js";
+import { GasStrategyService } from "../strategies/gasStrategy.js";
+import { validateConfig } from "../utils/config.js";
+import { fileToBuffer, getFileName, getContentType } from "../utils/file.js";
+import { Cache } from "../utils/cache.js";
+import type {
+  WalbucketConfig,
+  UploadOptions,
+  RetrieveOptions,
   TransformOptions,
-  FileInput 
-} from '../types/index.js';
-import type { 
-  UploadResult, 
+  FileInput,
+} from "../types/index.js";
+import type {
+  UploadResult,
   AssetMetadata,
-  RetrieveResult
-} from '../types/responses.js';
-import { ValidationError, BlockchainError } from '../types/errors.js';
-import crypto from 'crypto';
+  RetrieveResult,
+} from "../types/responses.js";
+import { ValidationError, BlockchainError } from "../types/errors.js";
+import crypto from "crypto";
 
 /**
  * Walbucket SDK
- * 
+ *
  * Main entry point for interacting with the Walbucket decentralized storage system.
  * Provides a Cloudinary-like API for uploading, retrieving, and managing assets
  * on the Sui blockchain with Walrus storage.
- * 
+ *
  * @example
  * ```typescript
  * import { Walbucket } from '@walbucket/sdk';
- * 
+ *
  * const walbucket = new Walbucket({
  *   apiKey: 'your-api-key',
  *   network: 'testnet',
  *   packageId: '0x...',
  * });
- * 
+ *
  * // Upload a file
  * const result = await walbucket.upload('path/to/file.jpg');
  * console.log('Asset ID:', result.assetId);
@@ -54,7 +60,7 @@ export class Walbucket {
 
   /**
    * Creates a new Walbucket SDK instance
-   * 
+   *
    * @param config - Configuration object for the SDK
    * @param config.apiKey - Your API key for authentication (required)
    * @param config.network - Sui network to use: 'testnet', 'mainnet', 'devnet', or 'localnet' (default: 'testnet')
@@ -69,9 +75,9 @@ export class Walbucket {
    * @param config.walrusAggregatorUrl - Custom Walrus aggregator URL (optional - auto-detected from network)
    * @param config.sealServerIds - Seal server IDs for encryption (optional - auto-detected from network)
    * @param config.cacheTTL - Cache TTL in seconds (default: 3600)
-   * 
+   *
    * @throws {ConfigurationError} If configuration is invalid
-   * 
+   *
    * @example
    * ```typescript
    * // Developer-sponsored gas (default) - you pay for all transactions
@@ -81,18 +87,18 @@ export class Walbucket {
    *   gasStrategy: 'developer-sponsored', // Default - can omit
    *   sponsorPrivateKey: 'your-private-key', // Required
    * });
-   * 
+   *
    * // User-pays gas - users pay their own gas fees
    * import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
    * const userKeypair = Ed25519Keypair.fromSecretKey(/* user's key *\/);
-   * 
+   *
    * const walbucket = new Walbucket({
    *   apiKey: 'your-api-key',
    *   network: 'testnet',
    *   gasStrategy: 'user-pays', // Users pay gas
    *   userSigner: userKeypair, // Required
    * });
-   * 
+   *
    * // With encryption disabled
    * const walbucket = new Walbucket({
    *   apiKey: 'your-api-key',
@@ -151,16 +157,19 @@ export class Walbucket {
    * Upload file
    * Complete flow: validate API key -> encrypt (if enabled) -> upload to Walrus -> create asset on Sui
    */
-  async upload(file: FileInput, options: UploadOptions = {}): Promise<UploadResult> {
+  async upload(
+    file: FileInput,
+    options: UploadOptions = {}
+  ): Promise<UploadResult> {
     try {
       // 1. Validate API key
       const apiKeyData = await this.apiKeyService.validateApiKey(
         this.config.apiKey,
         this.config.packageId
       );
-      
+
       if (!this.apiKeyService.hasPermission(apiKeyData, PERMISSION_UPLOAD)) {
-        throw new ValidationError('API key does not have upload permission');
+        throw new ValidationError("API key does not have upload permission");
       }
 
       // 2. Prepare file
@@ -174,7 +183,7 @@ export class Walbucket {
         this.config.packageId
       );
       if (!developerAccountId) {
-        throw new ValidationError('Developer account not found');
+        throw new ValidationError("Developer account not found");
       }
 
       const apiKeyHash = this.hashApiKey(this.config.apiKey);
@@ -186,7 +195,9 @@ export class Walbucket {
       // 4. Handle encryption flow
       if (encryptionEnabled && options.policy) {
         if (!this.sealService) {
-          throw new ValidationError('Seal service not initialized. Encryption requires Seal SDK.');
+          throw new ValidationError(
+            "Seal service not initialized. Encryption requires Seal SDK."
+          );
         }
 
         // For encryption, we need to:
@@ -209,8 +220,8 @@ export class Walbucket {
           contentType,
           size: fileData.length,
           tags: options.tags || [],
-          description: options.description || '',
-          category: options.category || '',
+          description: options.description || "",
+          category: options.category || "",
           width: options.width,
           height: options.height,
           thumbnailBlobId: options.thumbnailBlobId,
@@ -270,8 +281,8 @@ export class Walbucket {
           contentType,
           size: fileData.length,
           tags: options.tags || [],
-          description: options.description || '',
-          category: options.category || '',
+          description: options.description || "",
+          category: options.category || "",
           width: options.width,
           height: options.height,
           thumbnailBlobId: options.thumbnailBlobId,
@@ -295,11 +306,16 @@ export class Walbucket {
         createdAt: Date.now(),
       };
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof BlockchainError) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
         throw error;
       }
       throw new BlockchainError(
-        `Upload failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Upload failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -308,26 +324,26 @@ export class Walbucket {
 
   /**
    * Retrieve a file from Walbucket
-   * 
+   *
    * Complete flow:
    * 1. Validates API key and permissions
    * 2. Fetches asset metadata from Sui (cached)
    * 3. Retrieves file data from Walrus storage
    * 4. Decrypts file if encrypted (requires SessionKey)
-   * 
+   *
    * @param assetId - Asset ID to retrieve
    * @param options - Retrieve options
    * @param options.decrypt - Whether to decrypt the file (default: true if encrypted)
    * @param options.password - Password for password-protected assets
    * @param options.sessionKey - SessionKey from @mysten/seal (required for decryption)
-   * 
+   *
    * @returns RetrieveResult with file data, URL, and metadata
-   * 
+   *
    * @throws {ValidationError} If API key is invalid, lacks read permission, or SessionKey is missing for encrypted assets
    * @throws {NetworkError} If Walrus retrieval fails
    * @throws {BlockchainError} If asset not found on Sui
    * @throws {EncryptionError} If decryption fails
-   * 
+   *
    * @example
    * ```typescript
    * // Basic retrieve
@@ -335,7 +351,7 @@ export class Walbucket {
    * console.log('File data:', result.data);
    * console.log('File URL:', result.url);
    * console.log('Metadata:', result.metadata);
-   * 
+   *
    * // Retrieve with decryption
    * import { SealClient } from '@mysten/seal';
    * const sealClient = new SealClient(...);
@@ -345,16 +361,19 @@ export class Walbucket {
    * });
    * ```
    */
-  async retrieve(assetId: string, options: RetrieveOptions = {}): Promise<RetrieveResult> {
+  async retrieve(
+    assetId: string,
+    options: RetrieveOptions = {}
+  ): Promise<RetrieveResult> {
     try {
       // 1. Validate API key
       const apiKeyData = await this.apiKeyService.validateApiKey(
         this.config.apiKey,
         this.config.packageId
       );
-      
+
       if (!this.apiKeyService.hasPermission(apiKeyData, PERMISSION_READ)) {
-        throw new ValidationError('API key does not have read permission');
+        throw new ValidationError("API key does not have read permission");
       }
 
       // 2. Get asset metadata (cached)
@@ -362,7 +381,7 @@ export class Walbucket {
       if (!asset) {
         asset = await this.suiService.getAsset(assetId);
         if (!asset) {
-          throw new ValidationError('Asset not found');
+          throw new ValidationError("Asset not found");
         }
         // Generate URL for the asset
         asset.url = this.generateFileUrl(asset.blobId);
@@ -373,17 +392,19 @@ export class Walbucket {
       const encryptedData = await this.walrusService.retrieve(asset.blobId);
 
       // 4. Decrypt if encrypted and decrypt option is true
-      const shouldDecrypt = options.decrypt ?? (asset.policyId !== undefined);
-      
+      const shouldDecrypt = options.decrypt ?? asset.policyId !== undefined;
+
       if (shouldDecrypt && asset.policyId) {
         if (!this.sealService) {
-          throw new ValidationError('Seal service not initialized. Decryption requires Seal SDK.');
+          throw new ValidationError(
+            "Seal service not initialized. Decryption requires Seal SDK."
+          );
         }
 
         if (!options.sessionKey) {
           throw new ValidationError(
-            'SessionKey is required for decryption. ' +
-            'Create a SessionKey using @mysten/seal SessionKey.create() and provide it in retrieve options.'
+            "SessionKey is required for decryption. " +
+              "Create a SessionKey using @mysten/seal SessionKey.create() and provide it in retrieve options."
           );
         }
 
@@ -407,11 +428,16 @@ export class Walbucket {
         metadata: asset,
       };
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof BlockchainError) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
         throw error;
       }
       throw new BlockchainError(
-        `Retrieve failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Retrieve failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -429,9 +455,9 @@ export class Walbucket {
         this.config.apiKey,
         this.config.packageId
       );
-      
+
       if (!this.apiKeyService.hasPermission(apiKeyData, PERMISSION_DELETE)) {
-        throw new ValidationError('API key does not have delete permission');
+        throw new ValidationError("API key does not have delete permission");
       }
 
       // 2. Get asset metadata
@@ -439,7 +465,7 @@ export class Walbucket {
       if (!asset) {
         asset = await this.suiService.getAsset(assetId);
         if (!asset) {
-          throw new ValidationError('Asset not found');
+          throw new ValidationError("Asset not found");
         }
       }
 
@@ -449,7 +475,7 @@ export class Walbucket {
         this.config.packageId
       );
       if (!developerAccountId) {
-        throw new ValidationError('Developer account not found');
+        throw new ValidationError("Developer account not found");
       }
 
       // 4. Delete from Sui (this will fail if not owner, which is correct)
@@ -472,11 +498,16 @@ export class Walbucket {
       // 6. Clear cache
       this.assetCache.delete(assetId);
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof BlockchainError) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
         throw error;
       }
       throw new BlockchainError(
-        `Delete failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Delete failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -485,12 +516,12 @@ export class Walbucket {
 
   /**
    * Transform an asset (placeholder)
-   * 
+   *
    * Creates a transformation request on-chain for tracking.
    * **Note**: Actual image processing requires an external service (backend API) or
    * an image processing library like Sharp. This method is a placeholder that
    * validates the request and explains the limitation.
-   * 
+   *
    * @param assetId - Asset ID to transform
    * @param options - Transform options
    * @param options.width - Resize width
@@ -500,11 +531,11 @@ export class Walbucket {
    * @param options.format - Format conversion ('jpg', 'png', 'webp', 'gif')
    * @param options.quality - Quality 0-100
    * @param options.rotate - Rotation degrees (0, 90, 180, 270)
-   * 
+   *
    * @returns Transformation result (currently throws error explaining limitation)
-   * 
+   *
    * @throws {ValidationError} If API key lacks transform permission or transform requires external processing
-   * 
+   *
    * @example
    * ```typescript
    * // Note: This will throw an error explaining that image processing
@@ -521,22 +552,25 @@ export class Walbucket {
    * }
    * ```
    */
-  async transform(assetId: string, options: TransformOptions): Promise<{ assetId: string; blobId: string; requestId: string }> {
+  async transform(
+    assetId: string,
+    options: TransformOptions
+  ): Promise<{ assetId: string; blobId: string; requestId: string }> {
     try {
       // 1. Validate API key
       const apiKeyData = await this.apiKeyService.validateApiKey(
         this.config.apiKey,
         this.config.packageId
       );
-      
+
       if (!this.apiKeyService.hasPermission(apiKeyData, PERMISSION_TRANSFORM)) {
-        throw new ValidationError('API key does not have transform permission');
+        throw new ValidationError("API key does not have transform permission");
       }
 
       // 2. Get asset metadata
       const asset = await this.suiService.getAsset(assetId);
       if (!asset) {
-        throw new ValidationError('Asset not found');
+        throw new ValidationError("Asset not found");
       }
 
       // 3. Get developer account ID
@@ -545,7 +579,7 @@ export class Walbucket {
         this.config.packageId
       );
       if (!developerAccountId) {
-        throw new ValidationError('Developer account not found');
+        throw new ValidationError("Developer account not found");
       }
 
       // 4. Determine transformation type and encode parameters
@@ -576,23 +610,28 @@ export class Walbucket {
       // Note: This creates a request for tracking. Actual processing happens off-chain
       // The contract function: request_transformation_with_api_key
       const apiKeyHash = this.hashApiKey(this.config.apiKey);
-      
+
       // For MVP: Return the asset ID and note that transformation requires external processing
       // In production, you would:
       // 1. Process the image (using Sharp or similar)
       // 2. Upload transformed blob to Walrus
       // 3. Call transform_asset_with_api_key with the new blob ID
-      
+
       throw new ValidationError(
-        'Transform functionality requires image processing library (e.g., Sharp). ' +
-        'For now, use the backend API for transformations, or implement client-side processing.'
+        "Transform functionality requires image processing library (e.g., Sharp). " +
+          "For now, use the backend API for transformations, or implement client-side processing."
       );
     } catch (error) {
-      if (error instanceof ValidationError || error instanceof BlockchainError) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
         throw error;
       }
       throw new BlockchainError(
-        `Transform failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Transform failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         undefined,
         error instanceof Error ? error : undefined
       );
@@ -601,16 +640,16 @@ export class Walbucket {
 
   /**
    * Get asset metadata from Sui blockchain
-   * 
+   *
    * Fetches asset metadata including blob ID, name, size, content type, tags, etc.
    * Results are cached to reduce blockchain queries.
-   * 
+   *
    * @param assetId - Asset ID to query
-   * 
+   *
    * @returns Asset metadata or null if not found
-   * 
+   *
    * @throws {BlockchainError} If query fails
-   * 
+   *
    * @example
    * ```typescript
    * const asset = await walbucket.getAsset(assetId);
@@ -640,9 +679,100 @@ export class Walbucket {
   }
 
   /**
+   * List assets owned by an address
+   *
+   * Fetches all assets owned by the given address from the Sui blockchain.
+   * If no owner address is provided, uses the signer's address.
+   *
+   * @param owner - Optional owner address to query (defaults to signer's address)
+   *
+   * @returns Array of asset metadata
+   *
+   * @throws {ValidationError} If no owner provided and signer not available
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * // List assets for the signer
+   * const assets = await walbucket.list();
+   *
+   * // List assets for a specific address
+   * const assets = await walbucket.list('0x...');
+   * ```
+   */
+  async list(owner?: string): Promise<AssetMetadata[]> {
+    try {
+      let queryAddress = owner;
+
+      // If no owner provided, use signer's address
+      if (!queryAddress) {
+        if (!this.signer) {
+          throw new ValidationError(
+            "No owner address provided and no signer available"
+          );
+        }
+
+        // Get address from signer
+        // The signer should have a method to get the address
+        // For Ed25519Keypair, it's getPublicKey().toSuiAddress()
+        // For wallet signers from dapp-kit, the address is in the account object
+        if ("address" in this.signer) {
+          queryAddress = this.signer.address as string;
+        } else if (
+          "getPublicKey" in this.signer &&
+          typeof this.signer.getPublicKey === "function"
+        ) {
+          const publicKey = this.signer.getPublicKey();
+          if (
+            publicKey &&
+            "toSuiAddress" in publicKey &&
+            typeof publicKey.toSuiAddress === "function"
+          ) {
+            queryAddress = publicKey.toSuiAddress();
+          } else {
+            throw new ValidationError("Unable to get address from signer");
+          }
+        } else {
+          throw new ValidationError("Unable to get address from signer");
+        }
+      }
+
+      // Final check to ensure we have an address
+      if (!queryAddress) {
+        throw new ValidationError("Unable to determine owner address");
+      }
+
+      // Query blockchain for assets
+      const assets = await this.suiService.listAssets(queryAddress);
+
+      // Generate URLs and cache assets
+      for (const asset of assets) {
+        asset.url = this.generateFileUrl(asset.blobId);
+        this.assetCache.set(asset.assetId, asset);
+      }
+
+      return assets;
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `List failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * Generate file URL from blob ID
    * Creates a URL that can be used to access the file via Walrus aggregator
-   * 
+   *
    * @param blobId - Blob ID from Walrus storage
    * @returns Full URL to access the file
    */
@@ -654,6 +784,6 @@ export class Walbucket {
    * Hash API key (SHA-256)
    */
   private hashApiKey(apiKey: string): string {
-    return crypto.createHash('sha256').update(apiKey).digest('hex');
+    return crypto.createHash("sha256").update(apiKey).digest("hex");
   }
 }
