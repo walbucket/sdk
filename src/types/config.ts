@@ -95,11 +95,11 @@ export interface WalbucketConfig {
 /**
  * Default package IDs by network
  * Automatically selected based on network configuration
- * Latest testnet deployment (2025-01-30): 0x52b1196bdce066f48bdb66d16c516bb618d4daa34f4fdad77caba426d0c03795
- * Breaking change: Converted ApiKey and DeveloperAccount to shared objects for B2C platform
+ * Latest testnet deployment (2024-12-15): 0x481a774f5cf0a3437a6f9623604874681943950bb82c146051afdec74f0c9b26
+ * CRITICAL FIX: Assets uploaded via API key now owned by end user (tx_context::sender) instead of developer
  */
 export const DEFAULT_PACKAGE_IDS: Record<SuiNetwork, string> = {
-  testnet: "0x52b1196bdce066f48bdb66d16c516bb618d4daa34f4fdad77caba426d0c03795",
+  testnet: "0x481a774f5cf0a3437a6f9623604874681943950bb82c146051afdec74f0c9b26",
   mainnet: "", // To be deployed - will throw error if used
   devnet: "", // To be deployed - will throw error if used
   localnet: "", // To be deployed - will throw error if used
