@@ -213,14 +213,30 @@ export class SuiService {
       });
 
       // Build and sign transaction
-      const result = await this.jsonRpcClient.signAndExecuteTransaction({
-        transaction: tx,
-        signer: params.signer,
-        options: {
-          showEffects: true,
-          showEvents: true,
-        },
-      });
+      // Check if signer is a wallet account (has signAndExecuteTransaction method)
+      // or a keypair (has toSuiAddress method)
+      let result: any;
+
+      if (
+        "signAndExecuteTransaction" in params.signer &&
+        typeof params.signer.signAndExecuteTransaction === "function"
+      ) {
+        // Wallet signer - pass transaction and client
+        result = await params.signer.signAndExecuteTransaction({
+          transaction: tx,
+          client: this.jsonRpcClient,
+        });
+      } else {
+        // Keypair signer - use SuiClient's signAndExecuteTransaction
+        result = await this.jsonRpcClient.signAndExecuteTransaction({
+          transaction: tx,
+          signer: params.signer,
+          options: {
+            showEffects: true,
+            showEvents: true,
+          },
+        });
+      }
 
       // Extract asset ID from created objects
       if (result.effects?.created) {
