@@ -4,7 +4,7 @@
  */
 
 // Main SDK class
-export { Walbucket } from './core/walbucket.js';
+export { Walbucket } from "./core/walbucket.js";
 
 // Types
 export type {
@@ -23,7 +23,12 @@ export type {
   ApiKeyData,
   PolicyData,
   TransformResult,
-} from './types/index.js';
+  FolderMetadata,
+  BucketMetadata,
+  CollaboratorPermission,
+  AccessGrantData,
+  ShareableLinkData,
+} from "./types/index.js";
 
 // Errors
 export {
@@ -34,11 +39,18 @@ export {
   BlockchainError,
   ConfigurationError,
   ErrorCode,
-} from './types/errors.js';
+} from "./types/errors.js";
 
 // Services (for advanced usage)
-export { SuiService } from './services/suiService.js';
-export { WalrusService } from './services/walrusService.js';
-export { ApiKeyService, PERMISSION_UPLOAD, PERMISSION_READ, PERMISSION_DELETE, PERMISSION_TRANSFORM, PERMISSION_ADMIN } from './services/apiKeyService.js';
-export { SealService } from './services/sealService.js';
-export { GasStrategyService } from './strategies/gasStrategy.js';
+export { SuiService } from "./services/suiService.js";
+export { WalrusService } from "./services/walrusService.js";
+export {
+  ApiKeyService,
+  PERMISSION_UPLOAD,
+  PERMISSION_READ,
+  PERMISSION_DELETE,
+  PERMISSION_TRANSFORM,
+  PERMISSION_ADMIN,
+} from "./services/apiKeyService.js";
+export { SealService } from "./services/sealService.js";
+export { GasStrategyService } from "./strategies/gasStrategy.js";

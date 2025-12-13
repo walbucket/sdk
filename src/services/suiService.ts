@@ -3,7 +3,11 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import type { Signer } from "@mysten/sui/cryptography";
 import type { SuiNetwork, SignAndExecuteTransaction } from "../types/config.js";
-import type { AssetMetadata } from "../types/responses.js";
+import type {
+  AssetMetadata,
+  FolderMetadata,
+  BucketMetadata,
+} from "../types/responses.js";
 import { BlockchainError } from "../types/errors.js";
 import { getSuiGrpcUrl } from "../utils/config.js";
 
@@ -1605,6 +1609,468 @@ export class SuiService {
     } catch (error) {
       throw new BlockchainError(
         `Failed to list assets: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List all folders owned by the user
+   * Queries Sui blockchain for Folder objects owned by the specified address
+   */
+  async listFolders(owner?: string): Promise<FolderMetadata[]> {
+    const ownerAddress = owner || this.userAddress;
+
+    if (!ownerAddress) {
+      throw new BlockchainError(
+        "Owner address required. Provide owner parameter or configure userAddress."
+      );
+    }
+
+    try {
+      const response = await this.jsonRpcClient.getOwnedObjects({
+        owner: ownerAddress,
+        filter: {
+          StructType: `${this.packageId}::folder::Folder`,
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      const folders: FolderMetadata[] = [];
+
+      for (const item of response.data) {
+        if (
+          !item.data?.content ||
+          item.data.content.dataType !== "moveObject"
+        ) {
+          continue;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fields = item.data.content.fields as any;
+
+        // Parse folder data from Sui object
+        folders.push({
+          folderId: item.data.objectId,
+          owner: ownerAddress,
+          name: this.bytesToString(fields.name || []),
+          description: this.bytesToString(fields.description || []),
+          parentFolderId: fields.parent_folder_id?.fields?.id || undefined,
+          assetCount: parseInt(fields.asset_count || "0", 10),
+          createdAt: parseInt(fields.created_at || "0", 10),
+          updatedAt: parseInt(fields.updated_at || "0", 10),
+        });
+      }
+
+      return folders;
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to list folders: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  // ============================================================================
+  // B2B Bucket Operations
+  // ============================================================================
+
+  /**
+   * Create a new shared bucket for B2B collaborative storage
+   * Matches contract function: create_bucket
+   */
+  async createBucket(params: {
+    name: string;
+    description: string;
+    tags?: string[];
+    category?: string;
+    storageLimit?: number; // 0 = unlimited
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      const nameBytes = Array.from(Buffer.from(params.name, "utf-8"));
+      const descriptionBytes = Array.from(
+        Buffer.from(params.description, "utf-8")
+      );
+
+      // Convert tags to vector of vector<u8>
+      const tagsArg = (params.tags || []).map((tag) =>
+        Array.from(Buffer.from(tag, "utf-8"))
+      );
+
+      const categoryBytes = Array.from(
+        Buffer.from(params.category || "", "utf-8")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::create_bucket`,
+        arguments: [
+          tx.pure.vector("u8", nameBytes),
+          tx.pure.vector("u8", descriptionBytes),
+          tx.pure("vector<vector<u8>>", tagsArg),
+          tx.pure.vector("u8", categoryBytes),
+          tx.pure.u64(params.storageLimit || 0),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to create bucket: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List all buckets where user is owner or collaborator
+   * Note: For owned buckets, queries owned objects.
+   * For shared buckets where user is collaborator, we need to use events or an indexer.
+   */
+  async listOwnedBuckets(owner?: string): Promise<BucketMetadata[]> {
+    const ownerAddress = owner || this.userAddress;
+
+    if (!ownerAddress) {
+      throw new BlockchainError(
+        "Owner address required. Provide owner parameter or configure userAddress."
+      );
+    }
+
+    try {
+      // Note: Buckets are shared objects, so they don't appear in getOwnedObjects
+      // We need to query by the bucket's owner field using an indexer or events
+      // For now, we can query all Bucket objects and filter by owner
+      // This is a simplified implementation - production should use events/indexer
+
+      const response = await this.jsonRpcClient.queryEvents({
+        query: {
+          MoveEventType: `${this.packageId}::events::BucketCreatedEvent`,
+        },
+        limit: 100,
+      });
+
+      const buckets: BucketMetadata[] = [];
+
+      for (const event of response.data) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const eventData = event.parsedJson as any;
+
+        // Filter by owner
+        if (eventData.owner !== ownerAddress) {
+          continue;
+        }
+
+        // Fetch the actual bucket object for full metadata
+        try {
+          const bucketObj = await this.jsonRpcClient.getObject({
+            id: eventData.bucket_id,
+            options: { showContent: true },
+          });
+
+          if (
+            bucketObj.data?.content &&
+            bucketObj.data.content.dataType === "moveObject"
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fields = bucketObj.data.content.fields as any;
+
+            buckets.push({
+              bucketId: eventData.bucket_id,
+              owner: eventData.owner,
+              name: this.bytesToString(fields.name || []),
+              description: this.bytesToString(fields.description || []),
+              tags: (fields.tags || []).map((t: number[]) =>
+                this.bytesToString(t)
+              ),
+              category: this.bytesToString(fields.category || []),
+              collaboratorCount: parseInt(
+                fields.collaborators?.length || "0",
+                10
+              ),
+              assetCount: parseInt(fields.asset_ids?.length || "0", 10),
+              totalSize: parseInt(fields.total_size || "0", 10),
+              storageLimit: parseInt(fields.storage_limit || "0", 10),
+              createdAt: parseInt(fields.created_at || "0", 10),
+              updatedAt: parseInt(fields.updated_at || "0", 10),
+            });
+          }
+        } catch {
+          // Bucket may have been deleted, skip
+          continue;
+        }
+      }
+
+      return buckets;
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to list buckets: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Get a specific bucket by ID
+   */
+  async getBucket(bucketId: string): Promise<BucketMetadata | null> {
+    try {
+      const bucketObj = await this.jsonRpcClient.getObject({
+        id: bucketId,
+        options: { showContent: true, showOwner: true },
+      });
+
+      if (
+        !bucketObj.data?.content ||
+        bucketObj.data.content.dataType !== "moveObject"
+      ) {
+        return null;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields = bucketObj.data.content.fields as any;
+
+      return {
+        bucketId,
+        owner: fields.owner,
+        name: this.bytesToString(fields.name || []),
+        description: this.bytesToString(fields.description || []),
+        tags: (fields.tags || []).map((t: number[]) => this.bytesToString(t)),
+        category: this.bytesToString(fields.category || []),
+        collaboratorCount: parseInt(fields.collaborators?.length || "0", 10),
+        assetCount: parseInt(fields.asset_ids?.length || "0", 10),
+        totalSize: parseInt(fields.total_size || "0", 10),
+        storageLimit: parseInt(fields.storage_limit || "0", 10),
+        createdAt: parseInt(fields.created_at || "0", 10),
+        updatedAt: parseInt(fields.updated_at || "0", 10),
+      };
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to get bucket: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Add collaborator to bucket
+   * Matches contract function: add_collaborator
+   */
+  async addCollaborator(params: {
+    bucketId: string;
+    collaborator: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::add_collaborator`,
+        arguments: [
+          tx.object(params.bucketId),
+          tx.pure.address(params.collaborator),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to add collaborator: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Remove collaborator from bucket
+   * Matches contract function: remove_collaborator
+   */
+  async removeCollaborator(params: {
+    bucketId: string;
+    collaborator: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::remove_collaborator`,
+        arguments: [
+          tx.object(params.bucketId),
+          tx.pure.address(params.collaborator),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to remove collaborator: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Update collaborator permissions
+   * Matches contract function: update_collaborator_permissions
+   */
+  async updateCollaboratorPermissions(params: {
+    bucketId: string;
+    collaborator: string;
+    canRead: boolean;
+    canWrite: boolean;
+    canAdmin: boolean;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::update_collaborator_permissions`,
+        arguments: [
+          tx.object(params.bucketId),
+          tx.pure.address(params.collaborator),
+          tx.pure.bool(params.canRead),
+          tx.pure.bool(params.canWrite),
+          tx.pure.bool(params.canAdmin),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to update collaborator permissions: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Add asset to bucket
+   * Matches contract function: add_asset_to_bucket
+   */
+  async addAssetToBucket(params: {
+    bucketId: string;
+    assetId: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::add_asset_to_bucket`,
+        arguments: [
+          tx.object(params.bucketId),
+          tx.object(params.assetId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to add asset to bucket: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Remove asset from bucket
+   * Matches contract function: remove_asset_from_bucket
+   */
+  async removeAssetFromBucket(params: {
+    bucketId: string;
+    assetId: string;
+  }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::bucket::remove_asset_from_bucket`,
+        arguments: [
+          tx.object(params.bucketId),
+          tx.object(params.assetId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to remove asset from bucket: ${
           error instanceof Error ? error.message : String(error)
         }`,
         undefined,

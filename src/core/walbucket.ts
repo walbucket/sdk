@@ -23,6 +23,8 @@ import type {
   UploadResult,
   AssetMetadata,
   RetrieveResult,
+  FolderMetadata,
+  BucketMetadata,
 } from "../types/responses.js";
 import { ValidationError, BlockchainError } from "../types/errors.js";
 import crypto from "crypto";
@@ -1020,6 +1022,34 @@ export class Walbucket {
   }
 
   /**
+   * List all folders
+   *
+   * Retrieves all folders owned by the current user or a specified owner.
+   * Returns folder metadata including name, description, asset count, and timestamps.
+   *
+   * @param owner - Optional owner address (defaults to current user)
+   * @returns Array of folder metadata
+   *
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * // List current user's folders
+   * const folders = await walbucket.listFolders();
+   *
+   * // List specific user's folders
+   * const userFolders = await walbucket.listFolders('0x...');
+   *
+   * for (const folder of folders) {
+   *   console.log(`${folder.name}: ${folder.assetCount} assets`);
+   * }
+   * ```
+   */
+  async listFolders(owner?: string): Promise<FolderMetadata[]> {
+    return this.suiService.listFolders(owner);
+  }
+
+  /**
    * Move asset to folder
    *
    * Moves an asset into a folder or removes it from a folder. Supports both user-pays and developer-sponsored gas strategies.
@@ -1090,6 +1120,230 @@ export class Walbucket {
         error instanceof Error ? error : undefined
       );
     }
+  }
+
+  // ============================================================================
+  // B2B Bucket Operations
+  // ============================================================================
+
+  /**
+   * Create a new shared bucket for B2B collaborative storage
+   *
+   * Creates a shared bucket that can have multiple collaborators.
+   * Note: Only user-pays mode is supported for bucket creation.
+   *
+   * @param name - Bucket name
+   * @param options - Bucket options
+   * @param options.description - Bucket description
+   * @param options.tags - Tags for categorization
+   * @param options.category - Bucket category
+   * @param options.storageLimit - Storage limit in bytes (0 = unlimited)
+   *
+   * @throws {BlockchainError} If creation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.createBucket('Team Assets', {
+   *   description: 'Shared storage for team assets',
+   *   tags: ['team', 'assets'],
+   *   category: 'work'
+   * });
+   * ```
+   */
+  async createBucket(
+    name: string,
+    options: {
+      description?: string;
+      tags?: string[];
+      category?: string;
+      storageLimit?: number;
+    } = {}
+  ): Promise<void> {
+    return this.suiService.createBucket({
+      name,
+      description: options.description || "",
+      tags: options.tags,
+      category: options.category,
+      storageLimit: options.storageLimit,
+    });
+  }
+
+  /**
+   * List all buckets owned by the user
+   *
+   * @param owner - Optional owner address (defaults to current user)
+   * @returns Array of bucket metadata
+   *
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * const buckets = await walbucket.listBuckets();
+   * for (const bucket of buckets) {
+   *   console.log(`${bucket.name}: ${bucket.assetCount} assets, ${bucket.collaboratorCount} collaborators`);
+   * }
+   * ```
+   */
+  async listBuckets(owner?: string): Promise<BucketMetadata[]> {
+    return this.suiService.listOwnedBuckets(owner);
+  }
+
+  /**
+   * Get a specific bucket by ID
+   *
+   * @param bucketId - Bucket ID to fetch
+   * @returns Bucket metadata or null if not found
+   *
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * const bucket = await walbucket.getBucket('0x...');
+   * if (bucket) {
+   *   console.log(`${bucket.name}: ${bucket.assetCount} assets`);
+   * }
+   * ```
+   */
+  async getBucket(bucketId: string): Promise<BucketMetadata | null> {
+    return this.suiService.getBucket(bucketId);
+  }
+
+  /**
+   * Add a collaborator to a bucket
+   *
+   * @param bucketId - Bucket ID
+   * @param collaborator - Address of the collaborator
+   * @param permissions - Permission settings
+   *
+   * @throws {BlockchainError} If operation fails
+   *
+   * @example
+   * ```typescript
+   * // Add read-only collaborator
+   * await walbucket.addCollaborator('0x...bucket', '0x...user', {
+   *   canRead: true,
+   *   canWrite: false,
+   *   canAdmin: false
+   * });
+   *
+   * // Add full-access collaborator
+   * await walbucket.addCollaborator('0x...bucket', '0x...user', {
+   *   canRead: true,
+   *   canWrite: true,
+   *   canAdmin: true
+   * });
+   * ```
+   */
+  async addCollaborator(
+    bucketId: string,
+    collaborator: string,
+    permissions: {
+      canRead?: boolean;
+      canWrite?: boolean;
+      canAdmin?: boolean;
+    } = {}
+  ): Promise<void> {
+    return this.suiService.addCollaborator({
+      bucketId,
+      collaborator,
+      canRead: permissions.canRead ?? true,
+      canWrite: permissions.canWrite ?? false,
+      canAdmin: permissions.canAdmin ?? false,
+    });
+  }
+
+  /**
+   * Remove a collaborator from a bucket
+   *
+   * @param bucketId - Bucket ID
+   * @param collaborator - Address of the collaborator to remove
+   *
+   * @throws {BlockchainError} If operation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.removeCollaborator('0x...bucket', '0x...user');
+   * ```
+   */
+  async removeCollaborator(
+    bucketId: string,
+    collaborator: string
+  ): Promise<void> {
+    return this.suiService.removeCollaborator({ bucketId, collaborator });
+  }
+
+  /**
+   * Update collaborator permissions
+   *
+   * @param bucketId - Bucket ID
+   * @param collaborator - Address of the collaborator
+   * @param permissions - New permission settings
+   *
+   * @throws {BlockchainError} If operation fails
+   *
+   * @example
+   * ```typescript
+   * // Upgrade to write access
+   * await walbucket.updateCollaboratorPermissions('0x...bucket', '0x...user', {
+   *   canRead: true,
+   *   canWrite: true,
+   *   canAdmin: false
+   * });
+   * ```
+   */
+  async updateCollaboratorPermissions(
+    bucketId: string,
+    collaborator: string,
+    permissions: {
+      canRead?: boolean;
+      canWrite?: boolean;
+      canAdmin?: boolean;
+    }
+  ): Promise<void> {
+    return this.suiService.updateCollaboratorPermissions({
+      bucketId,
+      collaborator,
+      canRead: permissions.canRead ?? true,
+      canWrite: permissions.canWrite ?? false,
+      canAdmin: permissions.canAdmin ?? false,
+    });
+  }
+
+  /**
+   * Add an asset to a bucket
+   *
+   * @param bucketId - Bucket ID
+   * @param assetId - Asset ID to add
+   *
+   * @throws {BlockchainError} If operation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.addAssetToBucket('0x...bucket', '0x...asset');
+   * ```
+   */
+  async addAssetToBucket(bucketId: string, assetId: string): Promise<void> {
+    return this.suiService.addAssetToBucket({ bucketId, assetId });
+  }
+
+  /**
+   * Remove an asset from a bucket
+   *
+   * @param bucketId - Bucket ID
+   * @param assetId - Asset ID to remove
+   *
+   * @throws {BlockchainError} If operation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.removeAssetFromBucket('0x...bucket', '0x...asset');
+   * ```
+   */
+  async removeAssetFromBucket(
+    bucketId: string,
+    assetId: string
+  ): Promise<void> {
+    return this.suiService.removeAssetFromBucket({ bucketId, assetId });
   }
 
   /**
