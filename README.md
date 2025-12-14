@@ -4,13 +4,32 @@
 [![npm downloads](https://img.shields.io/npm/dm/@walbucket/sdk.svg)](https://www.npmjs.com/package/@walbucket/sdk)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
-Cloudinary-like API for decentralized media storage on Sui blockchain.
+Cloudinary-like API for decentralized media storage on Sui blockchain with advanced sharing and permission management.
 
 📦 **NPM Package**: [@walbucket/sdk](https://www.npmjs.com/package/@walbucket/sdk)
 
 ## About
 
-Walbucket SDK provides a simple, developer-friendly interface for storing and managing media files on the Sui blockchain using Walrus decentralized storage. With built-in encryption support via Seal, automatic URL generation, and flexible gas payment strategies, it's designed to make decentralized storage as easy as using traditional cloud storage services.
+Walbucket SDK provides a simple, developer-friendly interface for storing and managing media files on the Sui blockchain using Walrus decentralized storage. With built-in encryption support via Seal, automatic URL generation, flexible gas payment strategies, and granular access control, it's designed to make decentralized storage as easy as using traditional cloud storage services.
+
+## Features
+
+- ✅ **Standalone SDK** - No backend dependency
+- ✅ **Direct Sui Integration** - Uses Sui gRPC and JSON-RPC clients
+- ✅ **Walrus Storage** - Direct blob storage integration
+- ✅ **Seal Encryption** - Optional client-side encryption
+- ✅ **API Key Authentication** - On-chain API key validation
+- ✅ **Gas Strategies** - Developer-sponsored or user-pays
+- ✅ **Granular Permissions** - Read, write, and admin access control
+- ✅ **Access Grants** - Share with specific wallet addresses
+- ✅ **Shareable Links** - Create public links with optional expiration
+- ✅ **Password Protection** - Secure shares with passwords
+- ✅ **Time-Based Expiration** - Auto-expiring access
+- ✅ **Folder Organization** - Organize assets in folders
+- ✅ **Type-Safe** - Full TypeScript support
+- ✅ **Cloudinary-like API** - Familiar developer experience
+- ✅ **Automatic URL Generation** - File URLs automatically generated and returned
+- ✅ **Network Auto-Detection** - Package IDs automatically selected based on network
 
 ## Installation
 
@@ -43,14 +62,24 @@ const result = await walbucket.upload(file, {
 console.log(result.assetId); // Sui object ID
 console.log(result.url); // Automatically generated file URL
 
+// Share with specific user
+await walbucket.shareAsset(result.assetId, recipientAddress, {
+  canRead: true,
+  expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+});
+
+// Create public shareable link
+const shareToken = crypto.randomUUID();
+await walbucket.createShareableLink(result.assetId, {
+  shareToken,
+  canRead: true,
+  expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+});
+
 // Retrieve a file
 const retrieveResult = await walbucket.retrieve(result.assetId);
 console.log('File data:', retrieveResult.data);
 console.log('File URL:', retrieveResult.url);
-console.log('Metadata:', retrieveResult.metadata);
-
-// Delete a file
-await walbucket.delete(result.assetId);
 ```
 
 ## Configuration
@@ -97,136 +126,11 @@ interface WalbucketConfig {
 }
 ```
 
-## Gas Strategies
-
-Walbucket supports two gas payment strategies, giving you flexibility in how transactions are paid for:
-
-### Developer-Sponsored (Default)
-
-The developer pays for all gas fees. This provides the best user experience as users don't need to approve gas payments.
-
-**Benefits:**
-- ✅ Better user experience (no wallet popups for gas)
-- ✅ Users don't need SUI tokens
-- ✅ Simplified onboarding
-
-**Requirements:**
-- `sponsorPrivateKey`: Your private key for sponsoring transactions
-
-**Example:**
-```typescript
-const walbucket = new Walbucket({
-  apiKey: 'your-api-key',
-  network: 'testnet',
-  gasStrategy: 'developer-sponsored', // Default - can omit
-  sponsorPrivateKey: 'your-private-key', // Required
-});
-```
-
-### User-Pays
-
-Users pay their own gas fees. This is more decentralized and puts users in control.
-
-**Benefits:**
-- ✅ More decentralized
-- ✅ Users control their own transactions
-- ✅ No developer gas costs
-
-**Requirements:**
-- `userSigner`: Signer from the user's connected wallet extension
-- Users need SUI tokens for gas
-- Users must connect their wallet (Sui Wallet, Ethos, etc.)
-
-**Getting the User Signer:**
-
-Users connect their wallets through wallet extensions, and you get the signer from the connected wallet. Here are examples for different integration methods:
-
-**Using @mysten/dapp-kit (React Apps):**
-
-```typescript
-import { useCurrentWallet } from '@mysten/dapp-kit';
-import { Walbucket } from '@walbucket/sdk';
-import { useEffect, useState } from 'react';
-
-function MyComponent() {
-  const { currentWallet, isConnected } = useCurrentWallet();
-  const [walbucket, setWalbucket] = useState<Walbucket | null>(null);
-
-  useEffect(() => {
-    if (isConnected && currentWallet?.account) {
-      // Get signer from connected wallet
-      const walbucket = new Walbucket({
-        apiKey: 'your-api-key',
-        network: 'testnet',
-        gasStrategy: 'user-pays',
-        userSigner: currentWallet.account, // Signer from wallet extension
-      });
-      setWalbucket(walbucket);
-    }
-  }, [isConnected, currentWallet]);
-
-  // When upload is called, wallet popup appears for user to sign
-  const handleUpload = async (file: File) => {
-    if (!walbucket) return;
-    const result = await walbucket.upload(file);
-    console.log('Uploaded!', result.url);
-  };
-}
-```
-
-**Using @mysten/wallet-standard:**
-
-```typescript
-import { getWallets } from '@mysten/wallet-standard';
-import { Walbucket } from '@walbucket/sdk';
-
-// Get available wallets
-const wallets = getWallets();
-const wallet = wallets[0]; // User's wallet
-
-// Connect wallet (shows popup to user)
-await wallet.features['standard:connect'].connect();
-
-// Get signer from wallet
-const accounts = await wallet.features['standard:connect'].getAccounts();
-const signer = accounts[0]; // User's account signer
-
-// Create SDK instance
-const walbucket = new Walbucket({
-  apiKey: 'your-api-key',
-  network: 'testnet',
-  gasStrategy: 'user-pays',
-  userSigner: signer, // Signer from wallet extension
-});
-
-// When SDK methods are called, wallet popups appear automatically
-const result = await walbucket.upload(file);
-```
-
-**Important Notes:**
-- ✅ The `userSigner` comes from a connected wallet extension (Sui Wallet, Ethos, etc.)
-- ✅ Wallet popups appear automatically when SDK methods are called
-- ✅ Never ask users for their private keys - always use wallet extensions
-- ✅ The signer is provided by the wallet after the user connects
-
-**Note:** The `gasStrategy` field is optional and defaults to `'developer-sponsored'`. You can omit it if using the default strategy.
-
-## Features
-
-- ✅ **Standalone SDK** - No backend dependency
-- ✅ **Direct Sui Integration** - Uses Sui gRPC and JSON-RPC clients
-- ✅ **Walrus Storage** - Direct blob storage integration
-- ✅ **Seal Encryption** - Optional client-side encryption
-- ✅ **API Key Authentication** - On-chain API key validation
-- ✅ **Gas Strategies** - Developer-sponsored or user-pays
-- ✅ **Type-Safe** - Full TypeScript support
-- ✅ **Cloudinary-like API** - Familiar developer experience
-- ✅ **Automatic URL Generation** - File URLs automatically generated and returned
-- ✅ **Network Auto-Detection** - Package IDs automatically selected based on network
-
 ## API Reference
 
-### Upload
+### Core Operations
+
+#### Upload
 
 Upload a file to Walbucket storage.
 
@@ -242,96 +146,34 @@ const result = await walbucket.upload(file, options);
 - `name?: string` - Asset name
 - `folder?: string` - Folder/collection ID
 - `encryption?: boolean` - Enable encryption (default: true)
-- `policy?: EncryptionPolicy` - Encryption policy (see Encryption Policies below)
+- `policy?: EncryptionPolicy` - Encryption policy
 - `tags?: string[]` - Tags for categorization
 - `description?: string` - Asset description
 - `category?: string` - Asset category
 - `width?: number` - Image/video width in pixels
 - `height?: number` - Image/video height in pixels
 
-**Returns:**
-- `UploadResult` object with:
-  - `assetId: string` - Sui object ID
-  - `blobId: string` - Walrus blob ID
-  - `url: string` - Automatically generated file URL
-  - `encrypted: boolean` - Whether encrypted
-  - `policyId?: string` - Policy ID if encrypted
-  - `size: number` - File size in bytes
-  - `contentType: string` - MIME type
-  - `createdAt: number` - Timestamp
+**Returns:** `UploadResult` with `assetId`, `url`, `blobId`, `size`, etc.
 
-**Example:**
-```typescript
-const result = await walbucket.upload(file, {
-  name: 'photo.jpg',
-  folder: 'gallery',
-  encryption: true,
-  policy: {
-    type: 'wallet-gated',
-    addresses: ['0x...']
-  }
-});
+#### Retrieve
 
-console.log('Uploaded!', result.url);
-```
-
-### Retrieve
-
-Retrieve a file from Walbucket storage.
+Retrieve a file from storage.
 
 ```typescript
 const result = await walbucket.retrieve(assetId, options);
 ```
 
-**Parameters:**
-- `assetId`: Asset ID to retrieve
-- `options`: Retrieve options (optional)
+**Returns:** `RetrieveResult` with `data`, `url`, and `metadata`
 
-**Options:**
-- `decrypt?: boolean` - Decrypt the file (default: true if encrypted)
-- `password?: string` - Password for password-protected assets
-- `sessionKey?: SessionKey` - SessionKey from @mysten/seal (required for decryption)
+#### Delete
 
-**Returns:**
-- `RetrieveResult` object with:
-  - `data: Buffer` - File data
-  - `url: string` - Automatically generated file URL
-  - `metadata: AssetMetadata` - Complete asset metadata
-
-**Example:**
-```typescript
-// Basic retrieve
-const result = await walbucket.retrieve(assetId);
-console.log('File URL:', result.url);
-console.log('File size:', result.metadata.size);
-
-// Retrieve with decryption
-import { SealClient } from '@mysten/seal';
-const sealClient = new SealClient({ suiClient });
-const sessionKey = await sealClient.getSessionKey(policyId);
-
-const result = await walbucket.retrieve(assetId, {
-  sessionKey,
-});
-```
-
-### Delete
-
-Delete an asset from Walbucket storage.
+Delete an asset.
 
 ```typescript
 await walbucket.delete(assetId);
 ```
 
-**Parameters:**
-- `assetId`: Asset ID to delete
-
-**Example:**
-```typescript
-await walbucket.delete(assetId);
-```
-
-### Get Asset
+#### Get Asset
 
 Get asset metadata without retrieving the file.
 
@@ -339,84 +181,459 @@ Get asset metadata without retrieving the file.
 const asset = await walbucket.getAsset(assetId);
 ```
 
-**Parameters:**
-- `assetId`: Asset ID to query
+#### List Assets
 
-**Returns:**
-- `AssetMetadata | null` - Asset metadata including:
-  - `url: string` - Automatically generated file URL
-  - `assetId: string` - Asset ID
-  - `blobId: string` - Blob ID from Walrus
-  - `name: string` - Asset name
-  - `size: number` - File size in bytes
-  - `contentType: string` - MIME type
-  - `createdAt: number` - Creation timestamp
-  - `updatedAt: number` - Last update timestamp
-  - `tags: string[]` - Tags
-  - `description: string` - Description
-  - `category: string` - Category
-  - And more...
+List all assets for an address.
+
+```typescript
+const assets = await walbucket.list(ownerAddress?);
+```
+
+### File Operations
+
+#### Rename
+
+```typescript
+await walbucket.rename(assetId, newName);
+```
+
+#### Copy
+
+```typescript
+await walbucket.copy(assetId, newName);
+```
+
+### Folder Management
+
+#### Create Folder
+
+```typescript
+const folderId = await walbucket.createFolder(name, parentFolderId?);
+```
+
+#### Delete Folder
+
+```typescript
+await walbucket.deleteFolder(folderId);
+```
+
+#### Move to Folder
+
+```typescript
+await walbucket.moveToFolder(assetId, folderId?);
+```
+
+#### List Folders
+
+```typescript
+const folders = await walbucket.listFolders(ownerAddress?);
+```
+
+### Sharing & Permissions
+
+#### Access Grants (Private Sharing)
+
+**Share Asset** - Grant access to specific wallet address
+
+```typescript
+await walbucket.shareAsset(assetId, recipientAddress, {
+  canRead?: boolean;      // Default: true
+  canWrite?: boolean;     // Default: false
+  canAdmin?: boolean;     // Default: false
+  expiresAt?: number;     // Expiration timestamp in ms
+  passwordHash?: string;  // Password hash for protection
+});
+```
+
+**Permission Levels:**
+- `canRead: true` - View and download
+- `canWrite: true` - Modify asset
+- `canAdmin: true` - Full control including re-sharing
 
 **Example:**
+
 ```typescript
-const asset = await walbucket.getAsset(assetId);
-if (asset) {
-  console.log('Asset URL:', asset.url);
-  console.log('Name:', asset.name);
-  console.log('Size:', asset.size);
+// Read-only access for 7 days
+await walbucket.shareAsset(assetId, '0x123...', {
+  canRead: true,
+  expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000)
+});
+
+// Editor access (read + write)
+await walbucket.shareAsset(assetId, '0x456...', {
+  canRead: true,
+  canWrite: true
+});
+
+// Admin access (full control)
+await walbucket.shareAsset(assetId, '0x789...', {
+  canRead: true,
+  canWrite: true,
+  canAdmin: true
+});
+```
+
+**Revoke Share** - Revoke access grant
+
+```typescript
+await walbucket.revokeShare(grantId);
+```
+
+**List Access Grants** - View all grants
+
+```typescript
+const grants = await walbucket.listAccessGrants(ownerAddress?);
+```
+
+**Get Access Grant** - Get grant details
+
+```typescript
+const grant = await walbucket.getAccessGrant(grantId);
+```
+
+#### Shareable Links (Public Sharing)
+
+**Create Shareable Link** - Create public share link
+
+```typescript
+const shareToken = crypto.randomUUID();
+await walbucket.createShareableLink(assetId, {
+  shareToken: string;     // Required: unique token for URL
+  canRead?: boolean;      // Default: true
+  canWrite?: boolean;     // Default: false
+  canAdmin?: boolean;     // Default: false
+  expiresAt?: number;     // Expiration timestamp in ms
+  passwordHash?: string;  // Password hash for protection
+});
+
+// Share the URL
+const shareUrl = `https://yourapp.com/share/${shareToken}`;
+```
+
+**Example:**
+
+```typescript
+// Create link that expires in 24 hours
+const token = crypto.randomUUID();
+await walbucket.createShareableLink(assetId, {
+  shareToken: token,
+  canRead: true,
+  expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+});
+
+// Password-protected link
+import { createHash } from 'crypto';
+const passwordHash = createHash('sha256').update('secret123').digest('hex');
+
+await walbucket.createShareableLink(assetId, {
+  shareToken: crypto.randomUUID(),
+  canRead: true,
+  passwordHash
+});
+```
+
+**Deactivate Shareable Link** - Disable a link
+
+```typescript
+await walbucket.deactivateShareableLink(linkId);
+```
+
+**Track Link Access** - Monitor usage (user-pays only)
+
+```typescript
+await walbucket.trackLinkAccess(linkId);
+```
+
+**List Shareable Links** - View all links
+
+```typescript
+const links = await walbucket.listShareableLinks(ownerAddress?);
+```
+
+**Get Shareable Link** - Get link details with stats
+
+```typescript
+const link = await walbucket.getShareableLink(linkId);
+console.log(`Accessed ${link.accessCount} times`);
+```
+
+## Sharing Workflows
+
+### Private Sharing (Access Grants)
+
+Use when sharing with specific wallet addresses:
+
+```typescript
+// 1. Upload file
+const { assetId } = await walbucket.upload(file);
+
+// 2. Share with team member (read + write)
+await walbucket.shareAsset(assetId, teamMemberAddress, {
+  canRead: true,
+  canWrite: true,
+  expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+});
+
+// 3. Monitor all grants
+const grants = await walbucket.listAccessGrants();
+console.log(`Shared with ${grants.length} users`);
+
+// 4. Revoke access when needed
+await walbucket.revokeShare(grantId);
+```
+
+### Public Sharing (Shareable Links)
+
+Use for creating public share links:
+
+```typescript
+// 1. Upload file
+const { assetId } = await walbucket.upload(file);
+
+// 2. Create shareable link
+const token = crypto.randomUUID();
+await walbucket.createShareableLink(assetId, {
+  shareToken: token,
+  canRead: true,
+  expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+});
+
+// 3. Share the URL
+const shareUrl = `https://yourapp.com/share/${token}`;
+console.log('Share this link:', shareUrl);
+
+// 4. Track access (in user-pays mode)
+// When someone accesses the link:
+await walbucket.trackLinkAccess(linkId);
+
+// 5. Monitor usage
+const links = await walbucket.listShareableLinks();
+links.forEach(link => {
+  console.log(`${link.shareToken}: ${link.accessCount} accesses`);
+});
+
+// 6. Deactivate when no longer needed
+await walbucket.deactivateShareableLink(linkId);
+```
+
+## Gas Strategies
+
+### Developer-Sponsored (Default)
+
+Developer pays for all gas fees - best user experience.
+
+```typescript
+const walbucket = new Walbucket({
+  apiKey: 'your-api-key',
+  network: 'testnet',
+  gasStrategy: 'developer-sponsored', // Default
+  sponsorPrivateKey: 'your-private-key', // Required
+});
+```
+
+**Benefits:**
+- ✅ Better UX (no wallet popups for gas)
+- ✅ Users don't need SUI tokens
+- ✅ Simplified onboarding
+
+### User-Pays
+
+Users pay their own gas fees - more decentralized.
+
+```typescript
+import { useCurrentWallet } from '@mysten/dapp-kit';
+
+const { currentWallet } = useCurrentWallet();
+
+const walbucket = new Walbucket({
+  apiKey: 'your-api-key',
+  network: 'testnet',
+  gasStrategy: 'user-pays',
+  userSigner: currentWallet.account, // From connected wallet
+});
+```
+
+**Benefits:**
+- ✅ More decentralized
+- ✅ Users control transactions
+- ✅ No developer gas costs
+
+## Examples
+
+### Complete Upload & Share Flow
+
+```typescript
+import { Walbucket } from '@walbucket/sdk';
+
+const walbucket = new Walbucket({
+  apiKey: 'your-api-key',
+  network: 'testnet',
+  sponsorPrivateKey: 'your-private-key',
+});
+
+// 1. Upload file
+const { assetId, url } = await walbucket.upload(file, {
+  name: 'team-report.pdf',
+  folder: 'documents',
+  category: 'reports'
+});
+
+console.log('Uploaded:', url);
+
+// 2. Share with team (private)
+await walbucket.shareAsset(assetId, teamLeadAddress, {
+  canRead: true,
+  canWrite: true,
+  canAdmin: true
+});
+
+await walbucket.shareAsset(assetId, teamMemberAddress, {
+  canRead: true,
+  canWrite: false
+});
+
+// 3. Create public link for clients
+const token = crypto.randomUUID();
+await walbucket.createShareableLink(assetId, {
+  shareToken: token,
+  canRead: true,
+  expiresAt: Date.now() + (14 * 24 * 60 * 60 * 1000) // 14 days
+});
+
+const shareUrl = `https://yourapp.com/share/${token}`;
+console.log('Client link:', shareUrl);
+
+// 4. Monitor access
+const grants = await walbucket.listAccessGrants();
+const links = await walbucket.listShareableLinks();
+
+console.log(`Shared with ${grants.length} users`);
+console.log(`${links.length} public links created`);
+```
+
+### Wallet Integration (User-Pays)
+
+```typescript
+import { useCurrentWallet } from '@mysten/dapp-kit';
+import { Walbucket } from '@walbucket/sdk';
+import { useState, useEffect } from 'react';
+
+function UploadComponent() {
+  const { currentWallet, isConnected } = useCurrentWallet();
+  const [walbucket, setWalbucket] = useState<Walbucket | null>(null);
+
+  useEffect(() => {
+    if (isConnected && currentWallet?.account) {
+      const sdk = new Walbucket({
+        apiKey: 'your-api-key',
+        network: 'testnet',
+        gasStrategy: 'user-pays',
+        userSigner: currentWallet.account,
+      });
+      setWalbucket(sdk);
+    }
+  }, [isConnected, currentWallet]);
+
+  const handleUpload = async (file: File) => {
+    if (!walbucket) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    try {
+      const result = await walbucket.upload(file, {
+        name: file.name,
+      });
+      console.log('Uploaded!', result.url);
+    } catch (error) {
+      if (error.message.includes('User rejected')) {
+        console.log('User cancelled transaction');
+      }
+    }
+  };
+
+  return (
+    <div>
+      {!isConnected && <p>Connect your wallet to upload files</p>}
+      {walbucket && (
+        <input 
+          type="file" 
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleUpload(file);
+          }} 
+        />
+      )}
+    </div>
+  );
 }
 ```
 
-## Encryption Policies
-
-Walbucket supports multiple encryption policy types:
-
-### Wallet-Gated
-
-Only specific wallet addresses can access the file:
+### Access Management Dashboard
 
 ```typescript
-policy: {
-  type: 'wallet-gated',
-  addresses: ['0x...', '0x...']
+// View all sharing activity
+async function showAccessDashboard() {
+  const grants = await walbucket.listAccessGrants();
+  const links = await walbucket.listShareableLinks();
+  
+  // Group grants by asset
+  const grantsByAsset = grants.reduce((acc, grant) => {
+    if (!acc[grant.assetId]) acc[grant.assetId] = [];
+    acc[grant.assetId].push(grant);
+    return acc;
+  }, {});
+  
+  // Show stats
+  console.log('=== Access Dashboard ===');
+  console.log(`Total grants: ${grants.length}`);
+  console.log(`Total links: ${links.length}`);
+  console.log(`Active links: ${links.filter(l => l.isActive).length}`);
+  
+  // Show link stats
+  const totalAccesses = links.reduce((sum, l) => sum + l.accessCount, 0);
+  console.log(`Total link accesses: ${totalAccesses}`);
+  
+  // Show most accessed links
+  const topLinks = links
+    .sort((a, b) => b.accessCount - a.accessCount)
+    .slice(0, 5);
+    
+  console.log('\nTop 5 Links:');
+  topLinks.forEach((link, i) => {
+    console.log(`${i + 1}. ${link.shareToken}: ${link.accessCount} accesses`);
+  });
 }
 ```
 
-### Time-Limited
-
-File access expires at a specific timestamp:
+### Folder Organization
 
 ```typescript
-policy: {
-  type: 'time-limited',
-  expiration: Date.now() + 86400000 // 24 hours from now
-}
-```
+// Create folder structure
+const projectFolderId = await walbucket.createFolder('Project Alpha');
+const docsFolderId = await walbucket.createFolder('Documents', projectFolderId);
+const imagesFolderId = await walbucket.createFolder('Images', projectFolderId);
 
-### Password-Protected
+// Upload to folders
+const doc = await walbucket.upload(docFile, {
+  name: 'requirements.pdf',
+  folder: docsFolderId
+});
 
-File requires a password for access:
+const image = await walbucket.upload(imageFile, {
+  name: 'mockup.png',
+  folder: imagesFolderId
+});
 
-```typescript
-policy: {
-  type: 'password-protected',
-  password: 'my-secret-password'
-}
-```
+// Move files between folders
+await walbucket.moveToFolder(doc.assetId, imagesFolderId);
 
-### Public
-
-No access restrictions:
-
-```typescript
-policy: {
-  type: 'public'
-}
+// List folders
+const folders = await walbucket.listFolders();
+console.log(`${folders.length} folders created`);
 ```
 
 ## Error Handling
-
-The SDK provides typed error classes for better error handling:
 
 ```typescript
 import { 
@@ -441,298 +658,13 @@ try {
     console.error('Blockchain error:', error.message);
   } else if (error instanceof ConfigurationError) {
     console.error('Configuration error:', error.message);
-  } else if (error instanceof WalbucketError) {
-    console.error('Error code:', error.code);
   }
 }
 ```
-
-## Examples
-
-### Wallet Integration (User-Pays Gas Strategy)
-
-**React App with @mysten/dapp-kit:**
-
-```typescript
-import { useCurrentWallet, ConnectButton } from '@mysten/dapp-kit';
-import { Walbucket } from '@walbucket/sdk';
-import { useState, useEffect } from 'react';
-
-function UploadComponent() {
-  const { currentWallet, isConnected } = useCurrentWallet();
-  const [walbucket, setWalbucket] = useState<Walbucket | null>(null);
-
-  useEffect(() => {
-    if (isConnected && currentWallet?.account) {
-      // Create SDK instance when wallet is connected
-      const sdk = new Walbucket({
-        apiKey: 'your-api-key',
-        network: 'testnet',
-        gasStrategy: 'user-pays',
-        userSigner: currentWallet.account, // Signer from connected wallet
-      });
-      setWalbucket(sdk);
-    }
-  }, [isConnected, currentWallet]);
-
-  const handleUpload = async (file: File) => {
-    if (!walbucket) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    // Wallet popup will appear for user to sign transaction
-    try {
-      const result = await walbucket.upload(file, {
-        name: file.name,
-      });
-      console.log('Uploaded!', result.url);
-    } catch (error) {
-      if (error.message.includes('User rejected') || error.message.includes('rejected')) {
-        console.log('User cancelled transaction');
-      }
-    }
-  };
-
-  return (
-    <div>
-      <ConnectButton />
-      {!isConnected && <p>Connect your wallet to upload files</p>}
-      {walbucket && (
-        <input 
-          type="file" 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
-          }} 
-        />
-      )}
-    </div>
-  );
-}
-```
-
-**Vanilla JavaScript/TypeScript:**
-
-```typescript
-import { getWallets } from '@mysten/wallet-standard';
-import { Walbucket } from '@walbucket/sdk';
-
-async function setupWallet() {
-  // Get available wallets
-  const wallets = getWallets();
-  const wallet = wallets.find(w => w.name === 'Sui Wallet');
-  
-  if (!wallet) {
-    throw new Error('Sui Wallet not found. Please install Sui Wallet extension.');
-  }
-
-  // Connect wallet (shows popup to user)
-  await wallet.features['standard:connect'].connect();
-  
-  // Get user's account/signer from wallet
-  const accounts = await wallet.features['standard:connect'].getAccounts();
-  const signer = accounts[0];
-
-  // Create SDK with user signer
-  const walbucket = new Walbucket({
-    apiKey: 'your-api-key',
-    network: 'testnet',
-    gasStrategy: 'user-pays',
-    userSigner: signer, // User will sign transactions via wallet popup
-  });
-
-  return walbucket;
-}
-
-// Usage
-const walbucket = await setupWallet();
-// When uploading, wallet popup appears automatically for user to sign
-const result = await walbucket.upload(file);
-console.log('Uploaded!', result.url);
-```
-
-**How It Works:**
-1. User connects wallet → Wallet extension provides a `Signer` interface
-2. Developer passes signer to SDK → SDK stores it for transaction signing
-3. SDK calls transaction methods → Wallet popup appears automatically
-4. User approves in wallet → Transaction is signed and executed
-
-### Upload with Encryption
-
-```typescript
-const result = await walbucket.upload(file, {
-  name: 'secret-document.pdf',
-  encryption: true,
-  policy: {
-    type: 'wallet-gated',
-    addresses: ['0x123...', '0x456...']
-  }
-});
-
-console.log('Encrypted asset:', result.assetId);
-console.log('Policy ID:', result.policyId);
-```
-
-### Retrieve and Decrypt
-
-```typescript
-import { SealClient } from '@mysten/seal';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-
-const suiClient = new SuiClient({
-  url: getFullnodeUrl('testnet'),
-});
-
-const sealClient = new SealClient({ suiClient });
-const sessionKey = await sealClient.getSessionKey(policyId);
-
-const result = await walbucket.retrieve(assetId, {
-  sessionKey,
-});
-
-// Use the file data
-const fileContent = result.data.toString('utf8');
-```
-
-### Working with URLs
-
-```typescript
-// Upload returns URL automatically
-const uploadResult = await walbucket.upload(file);
-console.log('File URL:', uploadResult.url);
-
-// Retrieve also returns URL
-const retrieveResult = await walbucket.retrieve(assetId);
-console.log('File URL:', retrieveResult.url);
-
-// Get asset metadata includes URL
-const asset = await walbucket.getAsset(assetId);
-if (asset) {
-  console.log('Asset URL:', asset.url);
-  // Use URL directly in your app
-  // <img src={asset.url} />
-}
-```
-
-## Wallet Integration Guide
-
-### How User-Pays Gas Strategy Works
-
-When using `gasStrategy: 'user-pays'`, users sign transactions through their wallet extensions. Here's the complete flow:
-
-1. **User Connects Wallet**: User connects their Sui wallet (Sui Wallet, Ethos, etc.) to your app
-2. **Get Signer from Wallet**: The wallet provides a `Signer` interface after connection
-3. **Pass Signer to SDK**: Provide the signer to the SDK configuration
-4. **Transactions Trigger Wallet Popups**: When SDK methods are called, wallet popups appear for user approval
-
-### Complete Setup Example
-
-**Step 1: Install Wallet Dependencies**
-
-```bash
-pnpm add @mysten/dapp-kit @mysten/sui @tanstack/react-query
-```
-
-**Step 2: Setup Wallet Provider (React)**
-
-```typescript
-import { createNetworkConfig, SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
-import { getFullnodeUrl } from '@mysten/sui/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const { networkConfig } = createNetworkConfig({
-  testnet: { url: getFullnodeUrl('testnet') },
-  mainnet: { url: getFullnodeUrl('mainnet') },
-});
-
-const queryClient = new QueryClient();
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider>
-          <YourApp />
-        </WalletProvider>
-      </SuiClientProvider>
-    </QueryClientProvider>
-  );
-}
-```
-
-**Step 3: Use SDK with Wallet Signer**
-
-```typescript
-import { useCurrentWallet, ConnectButton } from '@mysten/dapp-kit';
-import { Walbucket } from '@walbucket/sdk';
-import { useEffect, useState } from 'react';
-
-function YourApp() {
-  const { currentWallet, isConnected } = useCurrentWallet();
-  const [walbucket, setWalbucket] = useState<Walbucket | null>(null);
-
-  useEffect(() => {
-    if (isConnected && currentWallet?.account) {
-      // Create SDK instance with user's wallet signer
-      const sdk = new Walbucket({
-        apiKey: 'your-api-key',
-        network: 'testnet',
-        gasStrategy: 'user-pays',
-        userSigner: currentWallet.account, // Signer from connected wallet
-      });
-      setWalbucket(sdk);
-    }
-  }, [isConnected, currentWallet]);
-
-  const handleUpload = async (file: File) => {
-    if (!walbucket) {
-      alert('Please connect your wallet');
-      return;
-    }
-
-    // Wallet popup will appear for user to approve transaction
-    try {
-      const result = await walbucket.upload(file, {
-        name: file.name,
-      });
-      console.log('Uploaded!', result.url);
-    } catch (error) {
-      if (error.message.includes('User rejected')) {
-        console.log('User cancelled transaction');
-      }
-    }
-  };
-
-  return (
-    <div>
-      <ConnectButton />
-      {!isConnected && <p>Connect your wallet to continue</p>}
-      {walbucket && (
-        <input 
-          type="file" 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
-          }} 
-        />
-      )}
-    </div>
-  );
-}
-```
-
-### Important Notes
-
-- **Never ask for private keys**: Always use wallet extensions to get signers
-- **Wallet popups are automatic**: When SDK methods are called, the wallet extension will show popups for user approval
-- **User must have SUI tokens**: For `user-pays` strategy, users need SUI tokens in their wallet for gas
-- **Signer comes from wallet**: The `userSigner` is provided by the wallet after connection, not from private keys
-- **Multiple transactions**: Each SDK method call (upload, delete, etc.) will trigger a wallet popup for user approval
 
 ## TypeScript Support
 
-The SDK is fully typed with TypeScript:
+The SDK is fully typed:
 
 ```typescript
 import type { 
@@ -740,17 +672,15 @@ import type {
   UploadResult,
   RetrieveResult,
   AssetMetadata,
-  EncryptionPolicy
+  EncryptionPolicy,
+  AccessGrant,
+  ShareableLink
 } from '@walbucket/sdk';
-
-const config: WalbucketConfig = {
-  apiKey: 'your-api-key',
-  network: 'testnet',
-  sponsorPrivateKey: 'your-private-key',
-};
-
-const walbucket = new Walbucket(config);
 ```
+
+## Documentation
+
+Full documentation available at [docs.walbucket.com](https://docs.walbucket.com)
 
 ## License
 
