@@ -217,10 +217,10 @@ export class SuiService {
               ? Array.from(Buffer.from(params.thumbnailBlobId))
               : null
           ),
-          // folder_id: Option<ID> - pass as object reference if provided, or null
-          // Note: In Sui, Option<ID> in Move maps to optional object reference
-          // Use "id" type, not "address" type
-          tx.pure.option("id", params.folderId || null),
+          // folder_id: Option<ID> - For Option<ID>, pass object ID as string (ID is essentially an address)
+          params.folderId
+            ? tx.pure.option("address", params.folderId)
+            : tx.pure.option("address", null),
           tx.object(params.apiKeyId),
           tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
@@ -427,6 +427,11 @@ export class SuiService {
       const catBytes = Array.from(Buffer.from(params.category));
 
       // Call contract function: upload_asset (user-pays, no API key objects)
+      // For Option<ID>, pass object ID as string wrapped in option (ID is essentially an address)
+      const folderIdArg = params.folderId
+        ? tx.pure.option("address", params.folderId)
+        : tx.pure.option("address", null);
+
       tx.moveCall({
         target: `${this.packageId}::asset::upload_asset`,
         arguments: [
@@ -445,8 +450,7 @@ export class SuiService {
               ? Array.from(Buffer.from(params.thumbnailBlobId))
               : null
           ),
-          // folder_id: Option<ID>
-          tx.pure.option("id", params.folderId || null),
+          folderIdArg,
           tx.object("0x6"), // Clock shared object
         ],
       });
