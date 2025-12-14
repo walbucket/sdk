@@ -219,10 +219,8 @@ export class SuiService {
           ),
           // folder_id: Option<ID> - pass as object reference if provided, or null
           // Note: In Sui, Option<ID> in Move maps to optional object reference
-          // We need to handle this as an optional object argument
-          // For now, using address as placeholder (backend uses same approach)
-          // TODO: Fix to use proper ID type when Sui SDK supports it
-          tx.pure.option("address", params.folderId || null),
+          // Use "id" type, not "address" type
+          tx.pure.option("id", params.folderId || null),
           tx.object(params.apiKeyId),
           tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
