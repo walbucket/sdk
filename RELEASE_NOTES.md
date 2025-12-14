@@ -1,5 +1,86 @@
 # Release Notes
 
+## v0.5.4 - Folder ID Fix & Ownership Improvements (2025-01-XX)
+
+### 🐛 Critical Bug Fixes
+
+- **Fixed Folder ID Handling for Upload Operations**: Corrected `Option<ID>` type handling in upload and move operations
+  - Changed from `tx.pure.option("id", folderId)` to `tx.pure.option("address", folderId)` 
+  - Files uploaded when a folder is open now correctly get assigned to that folder
+  - Files moved to folders now correctly appear in the destination folder
+  - Fixed in `uploadAssetUserPays()`, `moveAssetToFolder()`, and `createAsset()` methods
+
+- **Fixed Asset Ownership for User-Pays Uploads**: Added dedicated `uploadAssetUserPays()` method
+  - Assets uploaded in user-pays mode are now correctly owned by the user's wallet address
+  - Uses `upload_asset` contract function instead of `upload_asset_with_api_key` for user-pays
+  - Prevents ownership issues where assets were owned by developer's API key address
+  - API key validation still occurs for permissions, but not included in transaction
+
+### ✨ Enhancements
+
+- **Improved Transaction Retry Logic**: Enhanced error handling to prevent multiple wallet approval dialogs
+  - Smart retry logic that never retries on user rejections, blockchain errors, or validation errors
+  - Only retries network errors (connection issues, timeouts)
+  - All wallet transaction hooks now have `retry: false` to prevent duplicate approvals
+
+- **Better Ownership Verification**: Enhanced error messages for ownership mismatches
+  - Clear messages when files can't be moved due to ownership issues
+  - Displays both file owner and user wallet addresses for debugging
+  - Prevents transactions from being attempted when ownership doesn't match
+
+### 🔧 Technical Changes
+
+- Added `uploadAssetUserPays()` method to `SuiService` for user-pays uploads
+- Updated `walbucket.ts` to check `gasStrategy` and use appropriate upload method
+- Fixed `Option<ID>` type parameter from `"id"` to `"address"` for folderId in all methods
+- Enhanced query invalidation in dApp hooks for proper file list refreshing
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.5.4
+```
+
+---
+
+## v0.5.3 - Asset Ownership Fix (2025-01-XX)
+
+### 🐛 Bug Fixes
+
+- **Fixed Asset Ownership for User-Pays Uploads**: Added `uploadAssetUserPays()` method
+  - Assets uploaded in user-pays mode now correctly owned by user's wallet address
+  - Resolved issue where assets were owned by developer's API key address instead of user
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.5.3
+```
+
+---
+
+## v0.5.2 - Folder ID Type Fix (2025-01-XX)
+
+### 🐛 Bug Fixes
+
+- **Fixed Create Asset Folder ID Type**: Corrected folder ID type in `createAsset()` method
+  - Changed from `tx.pure.option("address", folderId)` to `tx.pure.option("id", folderId)`
+  - Ensures folder assignments work correctly for developer-sponsored uploads
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.5.2
+```
+
+---
+
 ## v0.5.1 - Move File Bug Fix (2025-01-XX)
 
 ### 🐛 Bug Fixes
