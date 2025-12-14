@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.5.1 - Move File Bug Fix (2025-01-XX)
+
+### 🐛 Bug Fixes
+
+- **Fixed Move File to Folder Transaction Error**: Corrected folder ID type from `"address"` to `"id"` in `moveAssetToFolder()` functions
+  - Resolved `MoveAbort` error (E_NOT_OWNER) when moving files to folders
+  - Fixed in both user-pays and API key-based move operations
+  - See [RELEASE_v0.5.1.md](./RELEASE_v0.5.1.md) for details
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.5.1
+```
+
+---
+
 ## v0.4.2 - Large File Upload Fixes (2025-12-01)
 
 ### 🐛 Bug Fixes

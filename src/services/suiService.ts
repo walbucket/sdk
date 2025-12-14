@@ -922,8 +922,8 @@ export class SuiService {
       const tx = new Transaction();
 
       const folderIdArg = params.folderId
-        ? tx.pure.option("address", params.folderId)
-        : tx.pure.option("address", null);
+        ? tx.pure.option("id", params.folderId)
+        : tx.pure.option("id", null);
 
       tx.moveCall({
         target: `${this.packageId}::asset::move_asset_to_folder`,
@@ -1161,8 +1161,8 @@ export class SuiService {
       );
 
       const folderIdArg = params.folderId
-        ? tx.pure.option("address", params.folderId)
-        : tx.pure.option("address", null);
+        ? tx.pure.option("id", params.folderId)
+        : tx.pure.option("id", null);
 
       tx.moveCall({
         target: `${this.packageId}::asset::move_asset_to_folder_with_api_key`,
