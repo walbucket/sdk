@@ -226,6 +226,9 @@ export class Walbucket {
         });
 
         // Step 2: Create asset on Sui (required before policy creation per contract)
+        // For encryption flow, we still need to use API key path for now
+        // because policy creation requires API key objects
+        // TODO: Consider if we can support user-pays with encryption
         assetId = await this.suiService.createAsset({
           blobId: plainBlobId,
           name: fileName,
@@ -287,23 +290,42 @@ export class Walbucket {
         });
 
         // 6. Create asset on Sui
-        assetId = await this.suiService.createAsset({
-          blobId,
-          name: fileName,
-          contentType,
-          size: fileData.length,
-          tags: options.tags || [],
-          description: options.description || "",
-          category: options.category || "",
-          width: options.width,
-          height: options.height,
-          thumbnailBlobId: options.thumbnailBlobId,
-          folderId: options.folder,
-          apiKeyId: apiKeyData.keyId,
-          apiKeyHash,
-          developerAccountId,
-          signer: this.signer,
-        });
+        // Use user-pays upload path when gasStrategy is user-pays
+        // This ensures assets are owned by the user's wallet address
+        if (this.config.gasStrategy === "user-pays") {
+          assetId = await this.suiService.uploadAssetUserPays({
+            blobId,
+            name: fileName,
+            contentType,
+            size: fileData.length,
+            tags: options.tags || [],
+            description: options.description || "",
+            category: options.category || "",
+            width: options.width,
+            height: options.height,
+            thumbnailBlobId: options.thumbnailBlobId,
+            folderId: options.folder,
+          });
+        } else {
+          // Developer-sponsored: use API key path
+          assetId = await this.suiService.createAsset({
+            blobId,
+            name: fileName,
+            contentType,
+            size: fileData.length,
+            tags: options.tags || [],
+            description: options.description || "",
+            category: options.category || "",
+            width: options.width,
+            height: options.height,
+            thumbnailBlobId: options.thumbnailBlobId,
+            folderId: options.folder,
+            apiKeyId: apiKeyData.keyId,
+            apiKeyHash,
+            developerAccountId,
+            signer: this.signer,
+          });
+        }
       }
 
       // 7. Return result

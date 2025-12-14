@@ -368,6 +368,185 @@ export class SuiService {
   }
 
   /**
+   * Upload asset for user-pays mode (no API key objects required)
+   *
+   * Creates a new asset using the `upload_asset` function which doesn't require
+   * API key objects. This ensures the asset is owned by the user's wallet address
+   * from the start.
+   *
+   * @param params - Asset creation parameters
+   * @param params.blobId - Blob ID from Walrus storage
+   * @param params.name - Asset name/filename
+   * @param params.contentType - MIME type of the asset
+   * @param params.size - File size in bytes
+   * @param params.tags - Tags for categorization
+   * @param params.description - Asset description
+   * @param params.category - Asset category
+   * @param params.width - Image width (optional, for images)
+   * @param params.height - Image height (optional, for images)
+   * @param params.thumbnailBlobId - Thumbnail blob ID (optional)
+   * @param params.folderId - Folder ID for organization (optional)
+   *
+   * @returns The created asset object ID
+   *
+   * @throws {BlockchainError} If transaction fails
+   *
+   * @example
+   * ```typescript
+   * const assetId = await suiService.uploadAssetUserPays({
+   *   blobId: 'blob_123',
+   *   name: 'image.jpg',
+   *   contentType: 'image/jpeg',
+   *   size: 1024,
+   *   tags: ['photo'],
+   * });
+   * ```
+   */
+  async uploadAssetUserPays(params: {
+    blobId: string;
+    name: string;
+    contentType: string;
+    size: number;
+    tags: string[];
+    description: string;
+    category: string;
+    width?: number;
+    height?: number;
+    thumbnailBlobId?: string;
+    folderId?: string;
+  }): Promise<string> {
+    try {
+      const tx = new Transaction();
+
+      // Convert strings to vectors (as required by contract)
+      const blobIdBytes = Array.from(Buffer.from(params.blobId));
+      const nameBytes = Array.from(Buffer.from(params.name));
+      const contentTypeBytes = Array.from(Buffer.from(params.contentType));
+      const tagsBytes = params.tags.map((tag) => Array.from(Buffer.from(tag)));
+      const descBytes = Array.from(Buffer.from(params.description));
+      const catBytes = Array.from(Buffer.from(params.category));
+
+      // Call contract function: upload_asset (user-pays, no API key objects)
+      tx.moveCall({
+        target: `${this.packageId}::asset::upload_asset`,
+        arguments: [
+          tx.pure.vector("u8", blobIdBytes),
+          tx.pure.vector("u8", nameBytes),
+          tx.pure.vector("u8", contentTypeBytes),
+          tx.pure.u64(BigInt(params.size)),
+          tx.pure.vector("vector<u8>", tagsBytes),
+          tx.pure.vector("u8", descBytes),
+          tx.pure.vector("u8", catBytes),
+          tx.pure.option("u64", params.width ? BigInt(params.width) : null),
+          tx.pure.option("u64", params.height ? BigInt(params.height) : null),
+          tx.pure.option(
+            "vector<u8>",
+            params.thumbnailBlobId
+              ? Array.from(Buffer.from(params.thumbnailBlobId))
+              : null
+          ),
+          // folder_id: Option<ID>
+          tx.pure.option("id", params.folderId || null),
+          tx.object("0x6"), // Clock shared object
+        ],
+      });
+
+      // Build and sign transaction
+      let result: any;
+      let digest: string | undefined;
+
+      if (this.signAndExecuteFn) {
+        // User-pays mode: use provided signAndExecuteTransaction function
+        try {
+          result = await this.signAndExecuteFn({
+            transaction: tx,
+          });
+
+          digest = result.digest || result.effects?.transactionDigest;
+
+          if (digest) {
+            // Wait for transaction to be indexed
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+
+            const txResult = await this.jsonRpcClient.waitForTransaction({
+              digest: digest,
+              options: {
+                showEffects: true,
+                showObjectChanges: true,
+                showEvents: true,
+              },
+            });
+
+            result = txResult;
+          }
+        } catch (error) {
+          console.error("[SDK] Error during transaction execution:", error);
+          throw error;
+        }
+      } else {
+        // Developer-sponsored mode: This path should not be used with uploadAssetUserPays
+        // If we reach here without signAndExecuteFn, it means we're in developer-sponsored mode
+        // but uploadAssetUserPays is designed for user-pays. Throw an error.
+        throw new BlockchainError(
+          "uploadAssetUserPays requires user-pays gas strategy with signAndExecuteFn. " +
+            "For developer-sponsored mode, use createAsset instead."
+        );
+      }
+
+      // Extract asset ID from created objects
+      if (result.objectChanges) {
+        for (const change of result.objectChanges) {
+          if (
+            change.type === "created" &&
+            change.objectType &&
+            change.objectType.includes("asset::Asset")
+          ) {
+            return change.objectId;
+          }
+        }
+      }
+
+      // Fallback: try to extract from effects
+      if (result.effects?.created) {
+        for (const created of result.effects.created) {
+          if (
+            created.reference?.objectId &&
+            created.owner &&
+            typeof created.owner === "object" &&
+            "AddressOwner" in created.owner
+          ) {
+            // Verify it's an Asset object by checking the type
+            const obj = await this.jsonRpcClient.getObject({
+              id: created.reference.objectId,
+              options: { showType: true },
+            });
+            if (
+              obj.data &&
+              "type" in obj.data &&
+              typeof obj.data.type === "string" &&
+              obj.data.type.includes("asset::Asset")
+            ) {
+              return created.reference.objectId;
+            }
+          }
+        }
+      }
+
+      throw new BlockchainError(
+        "Failed to extract asset ID from transaction result"
+      );
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to upload asset: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * Delete asset from Sui blockchain (developer-pays with API key)
    * Matches contract function: delete_asset_with_api_key
    */
