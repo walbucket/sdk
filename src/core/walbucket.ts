@@ -1654,6 +1654,258 @@ export class Walbucket {
   }
 
   /**
+   * Deactivate a shareable link
+   *
+   * Deactivates a shareable link, preventing further access via that link.
+   *
+   * @param linkId - ID of the ShareableLink to deactivate
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If deactivation fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.deactivateShareableLink('0x...linkId');
+   * ```
+   */
+  async deactivateShareableLink(linkId: string): Promise<void> {
+    try {
+      if (this.config.gasStrategy === "user-pays") {
+        // User-pays transaction
+        await this.suiService.deactivateShareableLink({ linkId });
+      } else {
+        // Developer-sponsored transaction
+        const apiKeyData = await this.apiKeyService.validateApiKey(
+          this.config.apiKey,
+          this.config.packageId
+        );
+
+        const developerAccountId =
+          await this.apiKeyService.getDeveloperAccountId(
+            apiKeyData.developerAddress,
+            this.config.packageId
+          );
+        if (!developerAccountId) {
+          throw new ValidationError("Developer account not found");
+        }
+
+        await this.suiService.deactivateShareableLinkWithApiKey({
+          linkId,
+          apiKeyHash: this.config.apiKey,
+          apiKeyId: apiKeyData.keyId,
+          developerAccountId,
+          signer: this.signer,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Deactivate shareable link failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Track shareable link access
+   *
+   * Updates the access statistics for a shareable link (access count, last accessed time).
+   * Call this when a link is accessed to update the tracking information.
+   *
+   * @param linkId - ID of the ShareableLink to track access for
+   *
+   * @throws {ValidationError} If configuration is invalid
+   * @throws {BlockchainError} If tracking fails
+   *
+   * @example
+   * ```typescript
+   * await walbucket.trackLinkAccess('0x...linkId');
+   * ```
+   */
+  async trackLinkAccess(linkId: string): Promise<void> {
+    try {
+      // This method only supports user-pays transactions
+      if (this.config.gasStrategy !== "user-pays") {
+        throw new ValidationError(
+          "trackLinkAccess only supports user-pays gas strategy"
+        );
+      }
+
+      await this.suiService.trackLinkAccess({ linkId });
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Track link access failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List access grants for an address
+   *
+   * Queries all AccessGrant objects owned by the given address.
+   *
+   * @param owner - Optional owner address (defaults to signer's address)
+   *
+   * @returns Array of access grant metadata
+   *
+   * @throws {ValidationError} If no owner provided and signer not available
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * const grants = await walbucket.listAccessGrants();
+   * ```
+   */
+  async listAccessGrants(owner?: string): Promise<any[]> {
+    try {
+      const ownerAddress = owner || this.config.userAddress;
+      if (!ownerAddress) {
+        throw new ValidationError(
+          "Owner address required. Provide owner parameter or configure userAddress."
+        );
+      }
+      return await this.suiService.listAccessGrants(ownerAddress);
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `List access grants failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List shareable links created by an address
+   *
+   * Queries all ShareableLink objects owned by the given address.
+   *
+   * @param owner - Optional owner address (defaults to signer's address)
+   *
+   * @returns Array of shareable link metadata
+   *
+   * @throws {ValidationError} If no owner provided and signer not available
+   * @throws {BlockchainError} If query fails
+   *
+   * @example
+   * ```typescript
+   * const links = await walbucket.listShareableLinks();
+   * ```
+   */
+  async listShareableLinks(owner?: string): Promise<any[]> {
+    try {
+      const ownerAddress = owner || this.config.userAddress;
+      if (!ownerAddress) {
+        throw new ValidationError(
+          "Owner address required. Provide owner parameter or configure userAddress."
+        );
+      }
+      return await this.suiService.listShareableLinks(ownerAddress);
+    } catch (error) {
+      if (
+        error instanceof ValidationError ||
+        error instanceof BlockchainError
+      ) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `List shareable links failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Get a specific access grant by ID
+   *
+   * @param grantId - ID of the AccessGrant to retrieve
+   *
+   * @returns Access grant metadata
+   *
+   * @throws {BlockchainError} If query fails or grant not found
+   *
+   * @example
+   * ```typescript
+   * const grant = await walbucket.getAccessGrant('0x...grantId');
+   * ```
+   */
+  async getAccessGrant(grantId: string): Promise<any> {
+    try {
+      return await this.suiService.getAccessGrant(grantId);
+    } catch (error) {
+      if (error instanceof BlockchainError) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Get access grant failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Get a specific shareable link by ID
+   *
+   * @param linkId - ID of the ShareableLink to retrieve
+   *
+   * @returns Shareable link metadata
+   *
+   * @throws {BlockchainError} If query fails or link not found
+   *
+   * @example
+   * ```typescript
+   * const link = await walbucket.getShareableLink('0x...linkId');
+   * ```
+   */
+  async getShareableLink(linkId: string): Promise<any> {
+    try {
+      return await this.suiService.getShareableLink(linkId);
+    } catch (error) {
+      if (error instanceof BlockchainError) {
+        throw error;
+      }
+      throw new BlockchainError(
+        `Get shareable link failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * List assets owned by an address
    *
    * Fetches all assets owned by the given address from the Sui blockchain.

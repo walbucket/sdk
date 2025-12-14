@@ -1715,6 +1715,113 @@ export class SuiService {
   }
 
   /**
+   * Deactivate shareable link (user-pays transaction)
+   * Matches contract function: deactivate_shareable_link
+   */
+  async deactivateShareableLink(params: { linkId: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::share::deactivate_shareable_link`,
+        arguments: [tx.object(params.linkId), tx.object("0x6")], // Clock
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to deactivate shareable link: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Deactivate shareable link (API key-sponsored)
+   * Matches contract function: deactivate_shareable_link_with_api_key
+   */
+  async deactivateShareableLinkWithApiKey(params: {
+    linkId: string;
+    apiKeyHash: string;
+    apiKeyId: string;
+    developerAccountId: string;
+    signer: Signer;
+  }): Promise<void> {
+    try {
+      const tx = new Transaction();
+
+      const apiKeyHashBytes = Array.from(
+        Buffer.from(params.apiKeyHash.replace("0x", ""), "hex")
+      );
+
+      tx.moveCall({
+        target: `${this.packageId}::share::deactivate_shareable_link_with_api_key`,
+        arguments: [
+          tx.object(params.linkId),
+          tx.object(params.apiKeyId),
+          tx.pure.vector("u8", apiKeyHashBytes),
+          tx.object(params.developerAccountId),
+          tx.object("0x6"), // Clock
+        ],
+      });
+
+      await this.jsonRpcClient.signAndExecuteTransaction({
+        transaction: tx,
+        signer: params.signer,
+      });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to deactivate shareable link: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Track shareable link access (user-pays transaction)
+   * Matches contract function: track_link_access
+   * Updates link statistics when accessed
+   */
+  async trackLinkAccess(params: { linkId: string }): Promise<void> {
+    if (!this.signAndExecuteFn || !this.userAddress) {
+      throw new BlockchainError(
+        "User-pays transaction not supported. signAndExecuteFn and userAddress required."
+      );
+    }
+
+    try {
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::share::track_link_access`,
+        arguments: [tx.object(params.linkId), tx.object("0x6")], // Clock
+      });
+
+      await this.signAndExecuteFn({ transaction: tx });
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to track link access: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
    * List assets owned by an address
    *
    * Queries the Sui blockchain for all Asset objects owned by the given address.
@@ -1790,6 +1897,236 @@ export class SuiService {
     } catch (error) {
       throw new BlockchainError(
         `Failed to list assets: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List access grants for an address
+   * Queries Sui blockchain for AccessGrant objects owned by the specified address
+   */
+  async listAccessGrants(owner?: string): Promise<any[]> {
+    const ownerAddress = owner || this.userAddress;
+
+    if (!ownerAddress) {
+      throw new BlockchainError(
+        "Owner address required. Provide owner parameter or configure userAddress."
+      );
+    }
+
+    try {
+      const response = await this.jsonRpcClient.getOwnedObjects({
+        owner: ownerAddress,
+        filter: {
+          StructType: `${this.packageId}::share::AccessGrant`,
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      const grants: any[] = [];
+
+      for (const item of response.data) {
+        if (
+          !item.data?.content ||
+          item.data.content.dataType !== "moveObject"
+        ) {
+          continue;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fields = item.data.content.fields as any;
+
+        grants.push({
+          grantId: item.data.objectId,
+          assetId: fields.asset_id?.fields?.id || fields.asset_id,
+          grantedBy: fields.granted_by,
+          grantedTo: fields.granted_to,
+          canRead: fields.permission?.fields?.can_read || false,
+          canWrite: fields.permission?.fields?.can_write || false,
+          canAdmin: fields.permission?.fields?.can_admin || false,
+          expiresAt: parseInt(fields.expires_at || "0", 10),
+          createdAt: parseInt(fields.created_at || "0", 10),
+        });
+      }
+
+      return grants;
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to list access grants: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * List shareable links created by an address
+   * Queries Sui blockchain for ShareableLink objects owned by the specified address
+   */
+  async listShareableLinks(owner?: string): Promise<any[]> {
+    const ownerAddress = owner || this.userAddress;
+
+    if (!ownerAddress) {
+      throw new BlockchainError(
+        "Owner address required. Provide owner parameter or configure userAddress."
+      );
+    }
+
+    try {
+      const response = await this.jsonRpcClient.getOwnedObjects({
+        owner: ownerAddress,
+        filter: {
+          StructType: `${this.packageId}::share::ShareableLink`,
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      const links: any[] = [];
+
+      for (const item of response.data) {
+        if (
+          !item.data?.content ||
+          item.data.content.dataType !== "moveObject"
+        ) {
+          continue;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fields = item.data.content.fields as any;
+
+        // Convert share_token vector<u8> to string
+        const shareTokenBytes = fields.share_token || [];
+        const shareToken = Buffer.from(shareTokenBytes).toString("utf-8");
+
+        links.push({
+          linkId: item.data.objectId,
+          assetId: fields.asset_id?.fields?.id || fields.asset_id,
+          creator: fields.creator,
+          shareToken,
+          canRead: fields.permission?.fields?.can_read || false,
+          canWrite: fields.permission?.fields?.can_write || false,
+          canAdmin: fields.permission?.fields?.can_admin || false,
+          expiresAt: parseInt(fields.expires_at || "0", 10),
+          isActive: fields.is_active || false,
+          createdAt: parseInt(fields.created_at || "0", 10),
+          lastAccessedAt: parseInt(fields.last_accessed_at || "0", 10),
+          accessCount: parseInt(fields.access_count || "0", 10),
+        });
+      }
+
+      return links;
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to list shareable links: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Get a specific access grant by ID
+   */
+  async getAccessGrant(grantId: string): Promise<any> {
+    try {
+      const response = await this.jsonRpcClient.getObject({
+        id: grantId,
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      if (
+        !response.data?.content ||
+        response.data.content.dataType !== "moveObject"
+      ) {
+        throw new BlockchainError("Access grant not found");
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields = response.data.content.fields as any;
+
+      return {
+        grantId: response.data.objectId,
+        assetId: fields.asset_id?.fields?.id || fields.asset_id,
+        grantedBy: fields.granted_by,
+        grantedTo: fields.granted_to,
+        canRead: fields.permission?.fields?.can_read || false,
+        canWrite: fields.permission?.fields?.can_write || false,
+        canAdmin: fields.permission?.fields?.can_admin || false,
+        expiresAt: parseInt(fields.expires_at || "0", 10),
+        createdAt: parseInt(fields.created_at || "0", 10),
+      };
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to get access grant: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Get a specific shareable link by ID
+   */
+  async getShareableLink(linkId: string): Promise<any> {
+    try {
+      const response = await this.jsonRpcClient.getObject({
+        id: linkId,
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      if (
+        !response.data?.content ||
+        response.data.content.dataType !== "moveObject"
+      ) {
+        throw new BlockchainError("Shareable link not found");
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields = response.data.content.fields as any;
+
+      // Convert share_token vector<u8> to string
+      const shareTokenBytes = fields.share_token || [];
+      const shareToken = Buffer.from(shareTokenBytes).toString("utf-8");
+
+      return {
+        linkId: response.data.objectId,
+        assetId: fields.asset_id?.fields?.id || fields.asset_id,
+        creator: fields.creator,
+        shareToken,
+        canRead: fields.permission?.fields?.can_read || false,
+        canWrite: fields.permission?.fields?.can_write || false,
+        canAdmin: fields.permission?.fields?.can_admin || false,
+        expiresAt: parseInt(fields.expires_at || "0", 10),
+        isActive: fields.is_active || false,
+        createdAt: parseInt(fields.created_at || "0", 10),
+        lastAccessedAt: parseInt(fields.last_accessed_at || "0", 10),
+        accessCount: parseInt(fields.access_count || "0", 10),
+      };
+    } catch (error) {
+      throw new BlockchainError(
+        `Failed to get shareable link: ${
           error instanceof Error ? error.message : String(error)
         }`,
         undefined,

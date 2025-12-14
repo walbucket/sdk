@@ -1,5 +1,33 @@
 # Release Notes
 
+## v0.5.5 - Share Feature Completeness (2025-01-XX)
+
+### 🎉 New Features
+
+- **Deactivate Shareable Links**: Added methods to deactivate shareable links
+  - `deactivateShareableLink(linkId)` - User-pays transaction
+  - `deactivateShareableLinkWithApiKey(...)` - API key-sponsored transaction
+  
+- **Link Access Tracking**: Added method to track link usage statistics
+  - `trackLinkAccess(linkId)` - Updates access count and last accessed timestamp
+
+### 🔍 Query Methods for Shares
+
+- **List Access Grants**: `listAccessGrants(owner?)` - Query all access grants for an address
+- **List Shareable Links**: `listShareableLinks(owner?)` - Query all shareable links created by an address
+- **Get Access Grant**: `getAccessGrant(grantId)` - Retrieve specific access grant details
+- **Get Shareable Link**: `getShareableLink(linkId)` - Retrieve specific shareable link details
+
+### 📝 Migration
+
+No breaking changes - automatic upgrade:
+
+```bash
+pnpm add @walbucket/sdk@0.5.5
+```
+
+---
+
 ## v0.5.4 - Folder ID Fix & Ownership Improvements (2025-01-XX)
 
 ### 🐛 Critical Bug Fixes
