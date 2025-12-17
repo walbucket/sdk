@@ -1825,15 +1825,27 @@ export class SuiService {
    * List assets owned by an address
    *
    * Queries the Sui blockchain for all Asset objects owned by the given address.
+   * Supports pagination via cursor.
    *
    * @param owner - The owner address to query assets for
-   * @returns Array of asset metadata
+   * @param cursor - Optional cursor for pagination
+   * @param limit - Optional limit for number of items per page (default: 20, max: 50)
+   * @returns Object with assets array, hasNextPage flag, and nextCursor for pagination
    * @throws {BlockchainError} If the query fails
    */
-  async listAssets(owner: string): Promise<AssetMetadata[]> {
+  async listAssets(
+    owner: string,
+    cursor?: string | null,
+    limit?: number | null
+  ): Promise<{
+    assets: AssetMetadata[];
+    hasNextPage: boolean;
+    nextCursor: string | null;
+  }> {
     try {
       console.log("[SDK] Listing assets for owner:", owner);
       console.log("[SDK] Using package ID:", this.packageId);
+      console.log("[SDK] Cursor:", cursor);
       console.log(
         "[SDK] Asset type filter:",
         `${this.packageId}::asset::Asset`
@@ -1849,12 +1861,14 @@ export class SuiService {
           showContent: true,
           showType: true,
         },
+        cursor: cursor || null,
+        limit: limit || null,
       });
 
       console.log("[SDK] getOwnedObjects response:", {
         count: response.data.length,
         hasNextPage: response.hasNextPage,
-        data: response.data,
+        nextCursor: response.nextCursor,
       });
 
       const assets: AssetMetadata[] = [];
@@ -1893,7 +1907,11 @@ export class SuiService {
         });
       }
 
-      return assets;
+      return {
+        assets,
+        hasNextPage: response.hasNextPage,
+        nextCursor: response.nextCursor || null,
+      };
     } catch (error) {
       throw new BlockchainError(
         `Failed to list assets: ${

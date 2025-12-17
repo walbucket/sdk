@@ -1910,24 +1910,42 @@ export class Walbucket {
    *
    * Fetches all assets owned by the given address from the Sui blockchain.
    * If no owner address is provided, uses the signer's address.
+   * Supports pagination via cursor.
    *
    * @param owner - Optional owner address to query (defaults to signer's address)
+   * @param cursor - Optional cursor for pagination
+   * @param limit - Optional limit for number of items per page (default: 20, max: 50)
    *
-   * @returns Array of asset metadata
+   * @returns Object with assets array, hasNextPage flag, and nextCursor for pagination
    *
    * @throws {ValidationError} If no owner provided and signer not available
    * @throws {BlockchainError} If query fails
    *
    * @example
    * ```typescript
-   * // List assets for the signer
-   * const assets = await walbucket.list();
+   * // List assets for the signer (first page)
+   * const result = await walbucket.list();
+   * console.log(result.assets); // Array of assets
+   * console.log(result.hasNextPage); // true if more pages available
+   *
+   * // List next page
+   * if (result.hasNextPage) {
+   *   const nextPage = await walbucket.list(undefined, result.nextCursor);
+   * }
    *
    * // List assets for a specific address
-   * const assets = await walbucket.list('0x...');
+   * const result = await walbucket.list('0x...');
    * ```
    */
-  async list(owner?: string): Promise<AssetMetadata[]> {
+  async list(
+    owner?: string,
+    cursor?: string | null,
+    limit?: number | null
+  ): Promise<{
+    assets: AssetMetadata[];
+    hasNextPage: boolean;
+    nextCursor: string | null;
+  }> {
     try {
       let queryAddress = owner;
 
@@ -1974,16 +1992,20 @@ export class Walbucket {
         throw new ValidationError("Unable to determine owner address");
       }
 
-      // Query blockchain for assets
-      const assets = await this.suiService.listAssets(queryAddress);
+      // Query blockchain for assets with pagination
+      const result = await this.suiService.listAssets(
+        queryAddress,
+        cursor,
+        limit
+      );
 
       // Generate URLs and cache assets
-      for (const asset of assets) {
+      for (const asset of result.assets) {
         asset.url = this.generateFileUrl(asset.blobId);
         this.assetCache.set(asset.assetId, asset);
       }
 
-      return assets;
+      return result;
     } catch (error) {
       if (
         error instanceof ValidationError ||
