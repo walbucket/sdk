@@ -96,7 +96,9 @@ export class SuiService {
         thumbnailBlobId: fields.thumbnail_blob_id
           ? this.bytesToString(fields.thumbnail_blob_id)
           : undefined,
-        folderId: fields.folder_id?.fields?.id || undefined,
+        folderId: typeof fields.folder_id === 'string' 
+          ? fields.folder_id 
+          : fields.folder_id?.fields?.id || undefined,
       };
     } catch (error) {
       throw new BlockchainError(
@@ -217,10 +219,10 @@ export class SuiService {
               ? Array.from(Buffer.from(params.thumbnailBlobId))
               : null
           ),
-          // folder_id: Option<ID> - For Option<ID>, pass object ID as string (ID is essentially an address)
+          // folder_id: Option<ID> - For Option<ID>, pass object ID as string
           params.folderId
-            ? tx.pure.option("address", params.folderId)
-            : tx.pure.option("address", null),
+            ? tx.pure.option("id", params.folderId)
+            : tx.pure.option("id", null),
           tx.object(params.apiKeyId),
           tx.pure.vector("u8", apiKeyHashBytes),
           tx.object(params.developerAccountId),
@@ -427,10 +429,10 @@ export class SuiService {
       const catBytes = Array.from(Buffer.from(params.category));
 
       // Call contract function: upload_asset (user-pays, no API key objects)
-      // For Option<ID>, pass object ID as string wrapped in option (ID is essentially an address)
+      // For Option<ID>, pass object ID as string wrapped in option
       const folderIdArg = params.folderId
-        ? tx.pure.option("address", params.folderId)
-        : tx.pure.option("address", null);
+        ? tx.pure.option("id", params.folderId)
+        : tx.pure.option("id", null);
 
       tx.moveCall({
         target: `${this.packageId}::asset::upload_asset`,
@@ -1028,8 +1030,8 @@ export class SuiService {
       );
 
       const parentFolderIdArg = params.parentFolderId
-        ? tx.pure.option("address", params.parentFolderId)
-        : tx.pure.option("address", null);
+        ? tx.pure.option("id", params.parentFolderId)
+        : tx.pure.option("id", null);
 
       tx.moveCall({
         target: `${this.packageId}::folder::create_folder`,
@@ -1246,8 +1248,8 @@ export class SuiService {
       );
 
       const parentFolderIdArg = params.parentFolderId
-        ? tx.pure.option("address", params.parentFolderId)
-        : tx.pure.option("address", null);
+        ? tx.pure.option("id", params.parentFolderId)
+        : tx.pure.option("id", null);
 
       tx.moveCall({
         target: `${this.packageId}::folder::create_folder_with_api_key`,
@@ -1903,7 +1905,9 @@ export class SuiService {
           thumbnailBlobId: fields.thumbnail_blob_id
             ? this.bytesToString(fields.thumbnail_blob_id)
             : undefined,
-          folderId: fields.folder_id?.fields?.id || undefined,
+          folderId: typeof fields.folder_id === 'string' 
+            ? fields.folder_id 
+            : fields.folder_id?.fields?.id || undefined,
         });
       }
 
